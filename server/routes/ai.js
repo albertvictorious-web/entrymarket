@@ -112,12 +112,12 @@ r.post('/chat', authRequired, async (req, res) => {
   /* 1) Google Gemini — satu model utama, cadangan hanya bila gagal cepat. */
   const geminiKey = process.env.GEMINI_API_KEY;
   if (geminiKey) {
-    const models = (process.env.GEMINI_MODEL || 'gemini-3.6-flash,gemini-3.5-flash').split(',');
+    const models = (process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite,gemini-flash-lite-latest,gemini-3.6-flash').split(',');
     const contents = turns.map((t) => ({
       role: t.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: t.content }],
     }));
-    const deadline = Date.now() + 40000;
+    const deadline = Date.now() + 30000;
     for (const model of models) {
       if (Date.now() > deadline) break;
       try {
@@ -133,7 +133,7 @@ r.post('/chat', authRequired, async (req, res) => {
               contents,
               generationConfig: { temperature: 0.4, maxOutputTokens: 700 },
             }),
-            signal: AbortSignal.timeout(38000),
+            signal: AbortSignal.timeout(12000),
           },
         );
         const json = await resp.json();
