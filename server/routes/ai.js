@@ -100,6 +100,7 @@ r.post('/chat', authRequired, async (req, res) => {
 
   let answer = '';
   let provider = 'local';
+  let lastErr = '';
 
   const history = await db.collection('ai_chats')
     .find({ userId: req.user._id })
@@ -145,8 +146,8 @@ r.post('/chat', authRequired, async (req, res) => {
           provider = model.trim();
           break;
         }
-      } catch {
-        /* coba model berikutnya */
+      } catch (e) {
+        lastErr = `${model.trim()}: ${String(e.message).slice(0, 80)}`;
       }
     }
   }
@@ -188,7 +189,7 @@ r.post('/chat', authRequired, async (req, res) => {
     userId: req.user._id, role: 'assistant', content: answer, createdAt: new Date(),
   });
 
-  res.json({ answer, provider });
+  res.json({ answer, provider, ...(lastErr && !answer ? { debug: lastErr } : {}) });
 });
 
 export default r;
