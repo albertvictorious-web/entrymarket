@@ -113,18 +113,22 @@ export async function renderTools(root, ctx) {
 
   /* Isi cache simbol yang belum punya harga, satu per satu agar tidak kena limit. */
   async function warmQuotes() {
-    const missing = quotes.filter((q) => !q.price).length;
-    if (!missing) return;
-    for (let i = 0; i < missing; i += 1) {
+    for (let i = 0; i < 12; i += 1) {
+      const missing = quotes.filter((q) => !q.price).length;
+      if (!missing) return;
       try {
         const r = await api.get('/market/quotes/warm');
-        if (!r.warmed) break;
+        if (!r.warmed) {
+          await new Promise((res) => setTimeout(res, 8000));
+          continue;
+        }
       } catch {
-        break;
+        await new Promise((res) => setTimeout(res, 8000));
+        continue;
       }
-      await new Promise((res) => setTimeout(res, 9000));
       await loadQuotes();
       if (tab === 'harga') renderHarga();
+      await new Promise((res) => setTimeout(res, 7500));
     }
   }
 

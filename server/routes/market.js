@@ -26,22 +26,17 @@ const STALE_TTL = 3600000;
    menembus batas dengan antrean berjeda + cache panjang. */
 const RATE = { limit: 7, windowMs: 60000, used: [], queue: Promise.resolve() };
 
+/* Tidak pernah menunggu lama: kalau kuota menit ini habis, langsung tolak
+   agar request tidak menggantung (serverless punya batas waktu eksekusi). */
 function rateGate() {
-  const run = async () => {
-    for (;;) {
-      const now = Date.now();
-      RATE.used = RATE.used.filter((t) => now - t < RATE.windowMs);
-      if (RATE.used.length < RATE.limit) {
-        RATE.used.push(now);
-        return;
-      }
-      const wait = RATE.windowMs - (now - RATE.used[0]) + 120;
-      await new Promise((r) => setTimeout(r, wait));
-    }
-  };
-  const next = RATE.queue.then(run, run);
-  RATE.queue = next.catch(() => {});
-  return next;
+  const now = Date.now();
+  RATE.used = RATE.used.filter((t) => now - t < RATE.windowMs);
+  if (RATE.used.length >= RATE.limit) {
+    const err = new Error('Kuota menit tercapai');
+    err.rateLimited = true;
+    throw err;
+  }
+  RATE.used.push(now);
 }
 
 async function cached(key, fn, ttl = TTL) {
@@ -58,7 +53,7 @@ async function cached(key, fn, ttl = TTL) {
 }
 
 async function fetchQuote(symbol) {
-  await rateGate();
+  rateGate();
   const url = `${BASE}/quote?symbol=${encodeURIComponent(symbol)}&apikey=${KEY}`;
   const resp = await fetch(url, { signal: AbortSignal.timeout(10000) });
   const json = await resp.json();
@@ -89,16 +84,20 @@ r.get('/quotes', authRequired, async (req, res) => {
   const only = String(req.query.symbols || '').split(',').map((x) => x.trim()).filter(Boolean);
   const targets = only.length ? SYMBOLS.filter((s) => only.includes(s.short)) : SYMBOLS;
 
-  const list = await Promise.all(targets.map(async (s) => {
+  const list = [];
+  for (const s of targets) {
     const hit = cache.get(`quote:${s.symbol}`);
-    if (hit) return shape(s, hit.value);
+    if (hit) {
+      list.push(shape(s, hit.value));
+      continue;
+    }
     try {
       const q = await cached(`quote:${s.symbol}`, () => fetchQuote(s.symbol));
-      return shape(s, q);
+      list.push(shape(s, q));
     } catch {
-      return empty(s);
+      list.push(empty(s));
     }
-  }));
+  }
 
   res.json({ quotes: list, source: 'Twelve Data' });
 });
