@@ -108,15 +108,17 @@ r.post('/chat', authRequired, async (req, res) => {
     .toArray();
   const turns = history.reverse().map((m) => ({ role: m.role, content: m.content }));
 
-  /* 1) Google Gemini */
+  /* 1) Google Gemini — satu model utama, cadangan hanya bila gagal cepat. */
   const geminiKey = process.env.GEMINI_API_KEY;
   if (geminiKey) {
-    const models = (process.env.GEMINI_MODEL || 'gemini-3.5-flash,gemini-3.6-flash,gemini-3.7-flash').split(',');
+    const models = (process.env.GEMINI_MODEL || 'gemini-3.6-flash,gemini-3.5-flash').split(',');
     const contents = turns.map((t) => ({
       role: t.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: t.content }],
     }));
+    const deadline = Date.now() + 18000;
     for (const model of models) {
+      if (Date.now() > deadline) break;
       try {
         const resp = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/${model.trim()}:generateContent?key=${geminiKey}`,
@@ -128,9 +130,9 @@ r.post('/chat', authRequired, async (req, res) => {
                 parts: [{ text: `${SYSTEM_PROMPT}\n\nKonteks data pengguna (JSON):\n${JSON.stringify(ctx)}` }],
               },
               contents,
-              generationConfig: { temperature: 0.4, maxOutputTokens: 800 },
+              generationConfig: { temperature: 0.4, maxOutputTokens: 700 },
             }),
-            signal: AbortSignal.timeout(25000),
+            signal: AbortSignal.timeout(9000),
           },
         );
         const json = await resp.json();
