@@ -17,13 +17,17 @@ export async function renderProfile(root, ctx) {
           <h1 style="margin:0 0 4px;font-size:24px;font-weight:800;letter-spacing:-.03em;color:#fff">${esc(me.name)}</h1>
           <div style="font-size:13px;color:rgba(255,255,255,.6)">${esc(me.email)}</div>
         </div>
-        <div style="text-align:right">
+        <div style="text-align:right;display:flex;flex-direction:column;gap:10px;align-items:flex-end">
           <div style="display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12)">
             <span style="width:26px;height:26px;display:inline-flex;color:#fff">${icons.building}</span>
             <div style="text-align:left">
               <div style="font-size:10px;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:.08em;font-weight:700">Broker</div>
               <div style="font-size:13px;font-weight:800;color:#fff">${esc(me.company)}</div>
             </div>
+          </div>
+          <div style="display:inline-flex;align-items:center;gap:9px;padding:7px 13px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1)">
+            <img src="/img/partner-doo-white.png" alt="Doo Financial Futures" style="height:26px;width:auto" />
+            <span style="font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.45);line-height:1.3;text-align:left">Official<br />Partner</span>
           </div>
         </div>
       </div>

@@ -65,6 +65,10 @@ function shell(user) {
               </button>`).join('')}
           `).join('')}
         </nav>
+        <div class="sidebar-partner">
+          <img src="/img/partner-doo.png" alt="Doo Financial Futures" />
+          <span class="sp-label">Official<br />Partner</span>
+        </div>
         <div class="sidebar-foot">
           <button class="user-chip" data-route="profile">
             <div class="avatar">${initials(user.name)}</div>
@@ -157,6 +161,10 @@ function renderLogin() {
         <div>
           <h2 class="login-headline">Trade Beyond <em>Limits</em></h1>
           <p class="login-sub">Platform dashboard marketing Entry Market — pantau NMI, kelola leads, jadwalkan appointment, dan raih reward traveling.</p>
+        </div>
+        <div class="login-partner">
+          <img src="/img/partner-doo-white.png" alt="Doo Financial Futures" />
+          <span class="lp-label">Broker<br />Partner</span>
         </div>
         <div class="login-stats">
           <div><strong>NMI</strong><span>Net Margin In</span></div>
