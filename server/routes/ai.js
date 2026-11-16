@@ -100,32 +100,83 @@ r.post('/chat', authRequired, async (req, res) => {
 
   let answer = '';
   let provider = 'local';
-  const key = process.env.OPENAI_API_KEY;
-  const base = process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
-  const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
-  if (key) {
+  const history = await db.collection('ai_chats')
+    .find({ userId: req.user._id })
+    .sort({ createdAt: -1 })
+    .limit(10)
+    .toArray();
+  const turns = history.reverse().map((m) => ({ role: m.role, content: m.content }));
+
+  /* 1) Google Gemini */
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (geminiKey) {
+    const models = (process.env.GEMINI_MODEL || 'gemini-3.5-flash,gemini-3.6-flash,gemini-3.7-flash').split(',');
+    const contents = turns.map((t) => ({
+      role: t.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: t.content }],
+    }));
+    for (const model of models) {
+      try {
+        const resp = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model.trim()}:generateContent?key=${geminiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              systemInstruction: {
+                parts: [{ text: `${SYSTEM_PROMPT}\n\nKonteks data pengguna (JSON):\n${JSON.stringify(ctx)}` }],
+              },
+              contents,
+              generationConfig: { temperature: 0.4, maxOutputTokens: 800 },
+            }),
+            signal: AbortSignal.timeout(25000),
+          },
+        );
+        const json = await resp.json();
+        const text = json?.candidates?.[0]?.content?.parts
+          ?.map((p) => p.text || '')
+          .join('')
+          .trim();
+        if (text) {
+          answer = text;
+          provider = model.trim();
+          break;
+        }
+      } catch {
+        /* coba model berikutnya */
+      }
+    }
+  }
+
+  /* 2) OpenAI (opsional) */
+  if (!answer && process.env.OPENAI_API_KEY) {
     try {
-      const history = await db.collection('ai_chats')
-        .find({ userId: req.user._id })
-        .sort({ createdAt: -1 })
-        .limit(10)
-        .toArray();
-      const messages = [
-        { role: 'system', content: `${SYSTEM_PROMPT}\n\nKonteks data pengguna (JSON):\n${JSON.stringify(ctx)}` },
-        ...history.reverse().map((m) => ({ role: m.role, content: m.content })),
-      ];
-      const resp = await fetch(`${base}/chat/completions`, {
+      const resp = await fetch(`${process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1'}/chat/completions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-        body: JSON.stringify({ model, messages, temperature: 0.4, max_tokens: 600 }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: `${SYSTEM_PROMPT}\n\nKonteks data pengguna (JSON):\n${JSON.stringify(ctx)}` },
+            ...turns,
+          ],
+          temperature: 0.4,
+          max_tokens: 600,
+        }),
         signal: AbortSignal.timeout(25000),
       });
       const json = await resp.json();
-      answer = json?.choices?.[0]?.message?.content?.trim() || '';
-      if (answer) provider = model;
+      const text = json?.choices?.[0]?.message?.content?.trim();
+      if (text) {
+        answer = text;
+        provider = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+      }
     } catch {
-      answer = '';
+      /* fallback ke jawaban lokal */
     }
   }
 
