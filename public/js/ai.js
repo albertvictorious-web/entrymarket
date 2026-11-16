@@ -72,6 +72,7 @@ export function mountAiAssistant(user) {
   function format(text) {
     return esc(text)
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/(^|\n)\s*[*-]\s+/g, '$1• ')
       .replace(/\n/g, '<br />');
   }
 
