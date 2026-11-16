@@ -116,7 +116,7 @@ r.post('/chat', authRequired, async (req, res) => {
       role: t.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: t.content }],
     }));
-    const deadline = Date.now() + 18000;
+    const deadline = Date.now() + 22000;
     for (const model of models) {
       if (Date.now() > deadline) break;
       try {
@@ -132,7 +132,7 @@ r.post('/chat', authRequired, async (req, res) => {
               contents,
               generationConfig: { temperature: 0.4, maxOutputTokens: 700 },
             }),
-            signal: AbortSignal.timeout(9000),
+            signal: AbortSignal.timeout(14000),
           },
         );
         const json = await resp.json();
