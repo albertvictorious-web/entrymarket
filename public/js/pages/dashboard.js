@@ -27,7 +27,7 @@ export async function renderDashboard(root, ctx) {
   async function load() {
     const [data, quotes, leads] = await Promise.all([
       api.get(`/dashboard/overview?range=${state.range}`),
-      api.get('/market/quotes').catch(() => ({ quotes: [] })),
+      api.get('/market/quotes?symbols=XAUUSD,EURUSD,GBPUSD,USDJPY').catch(() => ({ quotes: [] })),
       api.get('/leads').catch(() => []),
     ]);
     paint(data, quotes.quotes || [], leads);

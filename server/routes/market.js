@@ -15,28 +15,39 @@ export const SYMBOLS = [
 ];
 
 const cache = new Map();
-const TTL = 20000;
+const TTL = 60000;
 const NEWS_TTL = 300000;
+const STALE_TTL = 900000;
 
 async function cached(key, fn, ttl = TTL) {
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < ttl) return hit.value;
-  const value = await fn();
-  cache.set(key, { at: Date.now(), value });
-  return value;
+  try {
+    const value = await fn();
+    cache.set(key, { at: Date.now(), value });
+    return value;
+  } catch (e) {
+    // Free tier Twelve Data hanya 8 kredit/menit: pakai data terakhir bila masih wajar.
+    if (hit && Date.now() - hit.at < STALE_TTL) return hit.value;
+    throw e;
+  }
+}
+
+async function fetchQuote(symbol) {
+  const url = `${BASE}/quote?symbol=${encodeURIComponent(symbol)}&apikey=${KEY}`;
+  const resp = await fetch(url, { signal: AbortSignal.timeout(8000) });
+  const json = await resp.json();
+  if (json.code) throw new Error(json.message || `Error ${json.code}`);
+  return json;
 }
 
 r.get('/quotes', authRequired, async (req, res) => {
-  try {
-    const data = await cached('quotes', async () => {
-      const symbols = SYMBOLS.map((s) => s.symbol).join(',');
-      const url = `${BASE}/quote?symbol=${encodeURIComponent(symbols)}&apikey=${KEY}`;
-      const resp = await fetch(url);
-      const json = await resp.json();
-      return json;
-    });
-    const list = SYMBOLS.map((s) => {
-      const q = data[s.symbol] || {};
+  const only = String(req.query.symbols || '').split(',').map((x) => x.trim()).filter(Boolean);
+  const targets = only.length ? SYMBOLS.filter((s) => only.includes(s.short)) : SYMBOLS;
+
+  const list = await Promise.all(targets.map(async (s) => {
+    try {
+      const q = await cached(`quote:${s.symbol}`, () => fetchQuote(s.symbol));
       return {
         ...s,
         price: Number(q.close ?? q.price ?? 0),
@@ -49,11 +60,12 @@ r.get('/quotes', authRequired, async (req, res) => {
         isOpen: q.is_market_open !== false,
         updatedAt: q.datetime || null,
       };
-    });
-    res.json({ quotes: list, source: 'Twelve Data' });
-  } catch (e) {
-    res.status(502).json({ error: 'Gagal mengambil data pasar', detail: String(e.message) });
-  }
+    } catch {
+      return { ...s, price: 0, change: 0, percent: 0, high: 0, low: 0, open: 0, prevClose: 0, isOpen: false, updatedAt: null };
+    }
+  }));
+
+  res.json({ quotes: list, source: 'Twelve Data' });
 });
 
 const CALENDAR_FEEDS = {
