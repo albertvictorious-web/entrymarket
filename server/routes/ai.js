@@ -105,7 +105,7 @@ r.post('/chat', authRequired, async (req, res) => {
   const history = await db.collection('ai_chats')
     .find({ userId: req.user._id })
     .sort({ createdAt: -1 })
-    .limit(10)
+    .limit(4)
     .toArray();
   const turns = history.reverse().map((m) => ({ role: m.role, content: m.content }));
 
@@ -117,7 +117,7 @@ r.post('/chat', authRequired, async (req, res) => {
       role: t.role === 'assistant' ? 'model' : 'user',
       parts: [{ text: t.content }],
     }));
-    const deadline = Date.now() + 26000;
+    const deadline = Date.now() + 40000;
     for (const model of models) {
       if (Date.now() > deadline) break;
       try {
@@ -133,7 +133,7 @@ r.post('/chat', authRequired, async (req, res) => {
               contents,
               generationConfig: { temperature: 0.4, maxOutputTokens: 700 },
             }),
-            signal: AbortSignal.timeout(24000),
+            signal: AbortSignal.timeout(38000),
           },
         );
         const json = await resp.json();
