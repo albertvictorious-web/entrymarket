@@ -16,7 +16,36 @@ const TABS = [
   { id: 'kalender', label: 'Kalender Ekonomi', icon: 'calendar' },
   { id: 'sesi', label: 'Jam Sesi Pasar', icon: 'clock' },
   { id: 'berita', label: 'Berita Pasar', icon: 'news' },
+  { id: 'kalkulator', label: 'Kalkulator Profit', icon: 'target' },
 ];
+
+/* Kontrak per produk: nilai 1 lot, mata uang akun, dan mata uang kutipan. */
+const PRODUCTS = [
+  { id: 'XAUUSD', label: 'XAU/USD — Gold', contract: 100, quote: 'USD', digits: 2 },
+  { id: 'XAGUSD', label: 'XAG/USD — Silver', contract: 5000, quote: 'USD', digits: 3 },
+  { id: 'EURUSD', label: 'EUR/USD', contract: 100000, quote: 'USD', digits: 5 },
+  { id: 'GBPUSD', label: 'GBP/USD', contract: 100000, quote: 'USD', digits: 5 },
+  { id: 'AUDUSD', label: 'AUD/USD', contract: 100000, quote: 'USD', digits: 5 },
+  { id: 'NZDUSD', label: 'NZD/USD', contract: 100000, quote: 'USD', digits: 5 },
+  { id: 'USDJPY', label: 'USD/JPY', contract: 100000, quote: 'JPY', digits: 3 },
+  { id: 'USDCHF', label: 'USD/CHF', contract: 100000, quote: 'CHF', digits: 5 },
+  { id: 'USDCAD', label: 'USD/CAD', contract: 100000, quote: 'CAD', digits: 5 },
+  { id: 'USOIL', label: 'USOIL — Crude Oil', contract: 1000, quote: 'USD', digits: 2 },
+  { id: 'BTCUSD', label: 'BTC/USD — Bitcoin', contract: 1, quote: 'USD', digits: 2 },
+];
+
+const CURRENCIES = [
+  { id: 'USD', label: 'USD — US Dollar', symbol: '$' },
+  { id: 'IDR', label: 'IDR — Rupiah', symbol: 'Rp' },
+  { id: 'EUR', label: 'EUR — Euro', symbol: '€' },
+  { id: 'GBP', label: 'GBP — Pound', symbol: '£' },
+  { id: 'JPY', label: 'JPY — Yen', symbol: '¥' },
+  { id: 'SGD', label: 'SGD — Singapore Dollar', symbol: 'S$' },
+  { id: 'MYR', label: 'MYR — Ringgit', symbol: 'RM' },
+];
+
+/* Kurs indikatif untuk konversi tampilan (bukan harga eksekusi). */
+const RATES = { USD: 1, IDR: 16000, EUR: 0.92, GBP: 0.79, JPY: 156, SGD: 1.34, MYR: 4.45 };
 
 const IMPACT_LABEL = { High: 'High Impact', Medium: 'Medium', Low: 'Low', Holiday: 'Holiday' };
 
@@ -216,9 +245,11 @@ export async function renderTools(root, ctx) {
             <span class="cr-impact"><i class="impact ${e.impact}"></i><b>${IMPACT_LABEL[e.impact] || e.impact}</b></span>
             <span class="cr-cur">${esc(e.currency)}</span>
             <span class="cr-event">${esc(e.event)}</span>
-            <span class="cr-val actual" data-l="Actual">${esc(e.actual || '—')}</span>
-            <span class="cr-val forecast" data-l="Forecast">${esc(e.forecast || '—')}</span>
-            <span class="cr-val" data-l="Previous">${esc(e.previous || '—')}</span>
+            <div class="cal-vals">
+              <span class="cr-val actual" data-l="Actual">${esc(e.actual || '—')}</span>
+              <span class="cr-val forecast" data-l="Forecast">${esc(e.forecast || '—')}</span>
+              <span class="cr-val" data-l="Previous">${esc(e.previous || '—')}</span>
+            </div>
           </div>`).join('')}
       ` : '<div class="empty">Tidak ada event pada filter ini</div>';
     } catch (e) {
@@ -396,11 +427,141 @@ export async function renderTools(root, ctx) {
     }
   }
 
+  /* ================= KALKULATOR PROFIT ================= */
+  function renderKalkulator() {
+    body.innerHTML = `
+      <div class="calc-wrap">
+        <div class="card calc-card">
+          <div class="card-head">
+            <div><h3>Kalkulator Profit</h3><div class="hint">Hitung potensi profit/loss sebelum entry</div></div>
+          </div>
+
+          <div class="calc-grid">
+            <div class="field">
+              <label>Produk</label>
+              <select id="calc-product">
+                ${PRODUCTS.map((p) => `<option value="${p.id}">${p.label}</option>`).join('')}
+              </select>
+            </div>
+            <div class="field">
+              <label>Mata Uang Akun</label>
+              <select id="calc-currency">
+                ${CURRENCIES.map((c) => `<option value="${c.id}">${c.label}</option>`).join('')}
+              </select>
+            </div>
+            <div class="field">
+              <label>Jumlah Lot</label>
+              <input id="calc-lot" type="number" step="0.01" min="0" value="0.10" inputmode="decimal" />
+            </div>
+            <div class="field">
+              <label>Arah Posisi</label>
+              <div class="calc-side" id="calc-side">
+                <button type="button" data-side="buy" class="active">Buy / Long</button>
+                <button type="button" data-side="sell">Sell / Short</button>
+              </div>
+            </div>
+            <div class="field">
+              <label>Open Price</label>
+              <input id="calc-open" type="number" step="any" min="0" placeholder="0.00" inputmode="decimal" />
+            </div>
+            <div class="field">
+              <label>Close Price</label>
+              <input id="calc-close" type="number" step="any" min="0" placeholder="0.00" inputmode="decimal" />
+            </div>
+          </div>
+
+          <div class="calc-actions">
+            <button class="btn btn-primary" id="calc-run">${icons.target} Hitung Profit</button>
+            <button class="btn btn-ghost" id="calc-reset">${icons.refresh} Reset</button>
+          </div>
+        </div>
+
+        <div class="calc-result" id="calc-result"></div>
+      </div>`;
+
+    let side = 'buy';
+    const $ = (id) => body.querySelector(id);
+
+    body.querySelectorAll('#calc-side button').forEach((b) => {
+      b.addEventListener('click', () => {
+        side = b.dataset.side;
+        body.querySelectorAll('#calc-side button').forEach((x) => x.classList.toggle('active', x === b));
+      });
+    });
+
+    function compute() {
+      const product = PRODUCTS.find((p) => p.id === $('#calc-product').value);
+      const currency = $('#calc-currency').value;
+      const lot = Number($('#calc-lot').value) || 0;
+      const open = Number($('#calc-open').value) || 0;
+      const close = Number($('#calc-close').value) || 0;
+
+      if (!lot || !open || !close) {
+        $('#calc-result').innerHTML = `<div class="calc-empty">Isi jumlah lot, open price, dan close price untuk melihat hasil.</div>`;
+        return;
+      }
+
+      const diff = side === 'buy' ? close - open : open - close;
+      const pips = diff / (product.digits >= 4 ? 0.0001 : product.digits === 3 ? 0.001 : 0.01);
+      const profitQuote = diff * product.contract * lot;
+
+      /* Konversi dari mata uang kutipan ke mata uang akun. */
+      let profit = profitQuote;
+      if (product.quote !== currency) {
+        const from = RATES[product.quote] || 1;
+        const to = RATES[currency] || 1;
+        profit = (profitQuote / from) * to;
+      }
+
+      const sym = CURRENCIES.find((c) => c.id === currency)?.symbol || '';
+      const fmt = (v) => `${v < 0 ? '-' : ''}${sym}${Math.abs(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      const win = profit >= 0;
+
+      $('#calc-result').innerHTML = `
+        <div class="calc-out ${win ? 'win' : 'loss'}">
+          <div class="co-label">${win ? 'Estimasi Profit' : 'Estimasi Loss'}</div>
+          <div class="co-value">${fmt(profit)}</div>
+          <div class="co-sub">${side === 'buy' ? 'Buy' : 'Sell'} ${product.id} · ${lot} lot</div>
+        </div>
+        <div class="calc-detail">
+          <div class="cd-row"><span>Selisih harga</span><b>${diff.toFixed(product.digits)}</b></div>
+          <div class="cd-row"><span>Pips</span><b>${pips.toLocaleString('en-US', { maximumFractionDigits: 1 })}</b></div>
+          <div class="cd-row"><span>Nilai per pip</span><b>${fmt(Math.abs(profit) / Math.max(Math.abs(pips), 1))}</b></div>
+          <div class="cd-row"><span>Kontrak</span><b>${product.contract.toLocaleString('en-US')} / lot</b></div>
+          <div class="cd-row"><span>Mata uang kutipan</span><b>${product.quote}</b></div>
+          <div class="cd-row"><span>Profit kotor (${product.quote})</span><b>${product.quote === currency ? fmt(profitQuote) : `${product.quote} ${profitQuote.toLocaleString('en-US', { maximumFractionDigits: 2 })}`}</b></div>
+        </div>
+        <p class="calc-note">Hasil estimasi memakai kurs indikatif. Profit sebenarnya mengikuti harga penutupan broker Anda.</p>`;
+    }
+
+    $('#calc-run').addEventListener('click', compute);
+    $('#calc-reset').addEventListener('click', () => {
+      $('#calc-lot').value = '0.10';
+      $('#calc-open').value = '';
+      $('#calc-close').value = '';
+      side = 'buy';
+      body.querySelectorAll('#calc-side button').forEach((x) => x.classList.toggle('active', x.dataset.side === 'buy'));
+      $('#calc-result').innerHTML = '';
+    });
+    ['#calc-lot', '#calc-open', '#calc-close'].forEach((sel) => {
+      $(sel).addEventListener('input', () => {
+        if ($('#calc-open').value && $('#calc-close').value) compute();
+      });
+    });
+    $('#calc-product').addEventListener('change', () => {
+      if ($('#calc-open').value && $('#calc-close').value) compute();
+    });
+    $('#calc-currency').addEventListener('change', () => {
+      if ($('#calc-open').value && $('#calc-close').value) compute();
+    });
+  }
+
   /* ================= ROUTER TAB ================= */
   function paint() {
     if (tab === 'harga') renderHarga();
     else if (tab === 'kalender') renderKalender();
     else if (tab === 'sesi') renderSesi();
+    else if (tab === 'kalkulator') renderKalkulator();
     else renderBerita();
   }
 

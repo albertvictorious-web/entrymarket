@@ -19,9 +19,10 @@ export async function renderRewards(root, ctx) {
       <div class="card-head">
         <div><h3>Reward Cash Closing</h3><div class="hint">Setiap kelipatan closing $10.000 = Rp 500.000</div></div>
       </div>
+      <div id="closing-summary"></div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Closing</th><th class="num">Reward Tunai</th><th>Status</th><th></th></tr></thead>
+          <thead><tr><th>Closing</th><th class="num">Reward Tunai</th><th>Progres</th><th>Status</th><th></th></tr></thead>
           <tbody id="cash-tiers"></tbody>
         </table>
       </div>
@@ -66,18 +67,69 @@ export async function renderRewards(root, ctx) {
         </div>
       </div>`).join('');
 
+    const closing = progress.closing || 0;
+    const nextTier = progress.nextTier;
+    page.querySelector('#closing-summary').innerHTML = `
+      <div class="closing-sum">
+        <div class="cs-top">
+          <div>
+            <div class="cs-k">Total Closing ${isAdmin ? 'Tim' : 'Anda'} · 30 hari</div>
+            <div class="cs-v">${fmtUSD(closing)}</div>
+          </div>
+          <div class="cs-next">
+            ${nextTier
+              ? `<span>Menuju ${fmtUSD(nextTier.closing)}</span><b>${fmtIDR(nextTier.cash)}</b>`
+              : `<span>Target tertinggi tercapai</span><b>${fmtIDR(programs.cashTiers[programs.cashTiers.length - 1].cash)}</b>`}
+          </div>
+        </div>
+        <div class="progress" style="height:10px"><i style="width:${progress.closingProgress || 0}%"></i></div>
+        <div class="cs-foot">
+          <span>${progress.closingProgress || 0}% dari target maksimum ${fmtUSD(programs.cashTiers[programs.cashTiers.length - 1].closing)}</span>
+          ${nextTier ? `<span>Kurang ${fmtUSD(Math.max(0, nextTier.closing - closing))} lagi</span>` : '<span>Semua tier terbuka 🎉</span>'}
+        </div>
+      </div>`;
+
     page.querySelector('#cash-tiers').innerHTML = programs.cashTiers.map((t) => {
       const owned = rewards.find((r) => r.type === 'cash' && r.closingAmount === t.closing);
-      return `<tr>
+      const pct = t.progress ?? Math.min(100, Math.round((closing / t.closing) * 100));
+      const achieved = t.achieved ?? closing >= t.closing;
+      return `<tr class="${achieved ? 'tier-achieved' : ''}">
         <td><strong>Closing ${fmtUSD(t.closing)}</strong></td>
         <td class="num" style="font-weight:800;color:var(--brand)">${fmtIDR(t.cash)}</td>
+        <td style="min-width:130px">
+          <div class="tier-prog">
+            <div class="progress" style="height:7px"><i style="width:${pct}%"></i></div>
+            <span>${pct}%</span>
+          </div>
+        </td>
         <td>${owned
           ? `<span class="badge ${owned.status === 'claimed' ? 'green' : 'amber'}">${owned.status === 'claimed' ? 'Sudah di-claim' : 'Tersedia'}</span>`
-          : '<span class="badge gray">Belum tercapai</span>'}</td>
+          : achieved
+            ? '<span class="badge amber">Siap di-claim</span>'
+            : '<span class="badge gray">Belum tercapai</span>'}</td>
         <td class="num">${owned && owned.status === 'available' && !isAdmin
-          ? `<button class="btn btn-sm btn-primary" data-claim="${owned.id}">Claim</button>` : ''}</td>
+          ? `<button class="btn btn-sm btn-primary" data-claim="${owned.id}">Claim</button>`
+          : achieved && !owned && !isAdmin
+            ? `<button class="btn btn-sm btn-primary" data-request="${t.closing}">Claim</button>`
+            : ''}</td>
       </tr>`;
     }).join('');
+
+    page.querySelectorAll('[data-request]').forEach((b) => {
+      b.addEventListener('click', async () => {
+        const tier = programs.cashTiers.find((t) => String(t.closing) === b.dataset.request);
+        const ok = await confirmDialog(
+          `Ajukan claim ${fmtIDR(tier.cash)}?`,
+          `Reward untuk closing ${fmtUSD(tier.closing)} akan diajukan ke admin untuk diverifikasi.`,
+        );
+        if (!ok) return;
+        try {
+          await api.post('/rewards/request', { closingAmount: tier.closing });
+          toast('Pengajuan claim terkirim ke admin', 'success');
+          load();
+        } catch (e) { toast(e.message, 'error'); }
+      });
+    });
 
     page.querySelector('#my-rewards').innerHTML = rewards.length ? `<div class="table-wrap">
       <table>

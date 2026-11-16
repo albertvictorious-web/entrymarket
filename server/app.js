@@ -9,6 +9,9 @@ import appointmentRoutes from './routes/appointments.js';
 import rewardRoutes from './routes/rewards.js';
 import announcementRoutes from './routes/announcements.js';
 import marketRoutes from './routes/market.js';
+import noteRoutes from './routes/notes.js';
+import regLinkRoutes from './routes/reglinks.js';
+import aiRoutes from './routes/ai.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -29,6 +32,9 @@ export function createApp() {
   app.use('/api/rewards', rewardRoutes);
   app.use('/api/announcements', announcementRoutes);
   app.use('/api/market', marketRoutes);
+  app.use('/api/notes', noteRoutes);
+  app.use('/api/reglinks', regLinkRoutes);
+  app.use('/api/ai', aiRoutes);
 
   app.use('/api', (req, res) => res.status(404).json({ error: 'Endpoint tidak ditemukan' }));
 

@@ -76,7 +76,9 @@ export async function renderDashboard(root, ctx) {
         </div>
 
         <div class="hero-actions">
-          <button class="btn btn-primary" data-go="nmi">${icons.plus} Catat NMI</button>
+          ${isAdmin
+            ? `<button class="btn btn-primary" data-go="nmi">${icons.plus} Catat NMI</button>`
+            : `<button class="btn btn-primary" data-go="notes">${icons.edit} Buka Catatan</button>`}
           <button class="btn btn-glass" data-go="appointments">${icons.calendar} Buat Appointment</button>
           <button class="btn btn-glass" data-go="leads">${icons.leads} Lihat Leads</button>
         </div>

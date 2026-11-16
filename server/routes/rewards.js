@@ -85,9 +85,24 @@ r.get('/progress', authRequired, async (req, res) => {
   const s = agg[0] || { marginIn: 0, marginOut: 0, lots: 0 };
   const nmi = s.marginIn - s.marginOut;
   const lots = Math.round(s.lots * 10) / 10;
+
+  /* Closing = total margin in pada periode berjalan. */
+  const closing = Math.round(s.marginIn);
+  const maxTier = CASH_TIERS[CASH_TIERS.length - 1].closing;
+  const nextTier = CASH_TIERS.find((t) => closing < t.closing) || null;
+  const cashTiers = CASH_TIERS.map((t) => ({
+    ...t,
+    progress: Math.min(100, Math.round((closing / t.closing) * 100)),
+    achieved: closing >= t.closing,
+  }));
+
   res.json({
     nmi,
     lots,
+    closing,
+    closingProgress: Math.min(100, Math.round((closing / maxTier) * 100)),
+    nextTier,
+    cashTiers,
     travel: TRAVEL_PROGRAMS.map((p) => ({
       ...p,
       nmiProgress: Math.min(100, Math.round((nmi / p.targetNmi) * 100)),
@@ -112,6 +127,42 @@ r.post('/', authRequired, adminOnly, async (req, res) => {
     claimedAt: null,
   };
   const { insertedId } = await db.collection('rewards').insertOne(doc);
+  res.status(201).json({ id: String(insertedId) });
+});
+
+/* Marketing mengajukan claim tier yang sudah tercapai; admin memverifikasi. */
+r.post('/request', authRequired, async (req, res) => {
+  const db = getDb();
+  const closing = Number(req.body?.closingAmount);
+  const tier = CASH_TIERS.find((t) => t.closing === closing);
+  if (!tier) return res.status(400).json({ error: 'Tier reward tidak valid' });
+
+  const since = new Date(Date.now() - 30 * 86400000);
+  const agg = await db.collection('nmi').aggregate([
+    { $match: { marketingId: req.user._id, date: { $gte: since } } },
+    { $group: { _id: null, marginIn: { $sum: { $cond: [{ $eq: ['$type', 'in'] }, '$amount', 0] } } } },
+  ]).toArray();
+  const closingNow = Math.round(agg[0]?.marginIn || 0);
+  if (closingNow < tier.closing) {
+    return res.status(400).json({ error: `Closing Anda ${closingNow.toLocaleString('en-US')} belum mencapai ${closing.toLocaleString('en-US')}` });
+  }
+
+  const existing = await db.collection('rewards').findOne({
+    marketingId: req.user._id, type: 'cash', closingAmount: tier.closing,
+  });
+  if (existing) return res.status(400).json({ error: 'Reward tier ini sudah diajukan' });
+
+  const { insertedId } = await db.collection('rewards').insertOne({
+    marketingId: req.user._id,
+    type: 'cash',
+    title: `Reward Cash Closing $${tier.closing.toLocaleString('en-US')}`,
+    closingAmount: tier.closing,
+    cashValue: tier.cash,
+    status: 'available',
+    requestedBy: 'marketing',
+    createdAt: new Date(),
+    claimedAt: null,
+  });
   res.status(201).json({ id: String(insertedId) });
 });
 

@@ -1,6 +1,7 @@
 import { api } from '../api.js';
 import { icons } from '../icons.js';
 import { fmtUSD, fmtNum, fmtDate, initials, esc } from '../utils.js';
+import { toast, confirmDialog } from '../ui.js';
 
 export async function renderProfile(root, ctx) {
   const [me, overview] = await Promise.all([
@@ -52,6 +53,14 @@ export async function renderProfile(root, ctx) {
         <div class="d">dari ${overview.totalMarketers} marketing</div></div>
     </div>
 
+    <div class="card" style="margin-bottom:18px">
+      <div class="card-head">
+        <div><h3>Link Registrasi Nasabah</h3><div class="hint">Simpan beberapa link untuk dibagikan ke calon nasabah</div></div>
+        <button class="btn btn-sm btn-primary" id="add-link">${icons.plus} Tambah Link</button>
+      </div>
+      <div id="link-list"></div>
+    </div>
+
     <div class="card">
       <div class="card-head"><h3>Pengaturan Akun</h3></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
@@ -61,7 +70,122 @@ export async function renderProfile(root, ctx) {
         Untuk mengubah nama, nomor HP, atau password, hubungi admin Entry Market.
       </p>
     </div>
+
+    <div class="copyright">Entry Market | PT. Sosial Grow Media Connection</div>
   </div>`;
 
   root.querySelector('#logout-btn').addEventListener('click', () => ctx.logout());
+
+  /* ---------- Link Registrasi ---------- */
+  const linkList = root.querySelector('#link-list');
+  let links = [];
+
+  function paintLinks() {
+    if (!links.length) {
+      linkList.innerHTML = `<div class="empty" style="padding:26px 0">Belum ada link. Tambahkan link registrasi nasabah Anda.</div>`;
+      return;
+    }
+    linkList.innerHTML = links.map((l) => `
+      <div class="reglink">
+        <div class="rl-main">
+          <div class="rl-title">${esc(l.title)}</div>
+          <a class="rl-url" href="${esc(l.url)}" target="_blank" rel="noopener">${esc(l.url)}</a>
+          ${l.note ? `<div class="rl-note">${esc(l.note)}</div>` : ''}
+        </div>
+        <div class="rl-actions">
+          <button class="btn btn-sm btn-primary" data-copy="${l.id}">${icons.check} Copy</button>
+          <button class="icon-btn" style="width:32px;height:32px" data-edit="${l.id}">${icons.edit}</button>
+          <button class="icon-btn" style="width:32px;height:32px" data-rm="${l.id}">${icons.trash}</button>
+        </div>
+      </div>`).join('');
+
+    linkList.querySelectorAll('[data-copy]').forEach((b) => {
+      b.addEventListener('click', async () => {
+        const l = links.find((x) => x.id === b.dataset.copy);
+        try {
+          await navigator.clipboard.writeText(l.url);
+          toast('Link disalin ke clipboard', 'success');
+        } catch {
+          const ta = document.createElement('textarea');
+          ta.value = l.url;
+          document.body.appendChild(ta);
+          ta.select();
+          document.execCommand('copy');
+          ta.remove();
+          toast('Link disalin', 'success');
+        }
+      });
+    });
+    linkList.querySelectorAll('[data-edit]').forEach((b) => {
+      b.addEventListener('click', () => openLinkModal(links.find((x) => x.id === b.dataset.edit)));
+    });
+    linkList.querySelectorAll('[data-rm]').forEach((b) => {
+      b.addEventListener('click', async () => {
+        const ok = await confirmDialog('Hapus link ini?', 'Link akan dihapus dari daftar Anda.');
+        if (!ok) return;
+        try {
+          await api.del(`/reglinks/${b.dataset.rm}`);
+          toast('Link dihapus', 'success');
+          await loadLinks();
+        } catch (e) { toast(e.message, 'error'); }
+      });
+    });
+  }
+
+  function openLinkModal(link) {
+    const wrap = document.createElement('div');
+    wrap.className = 'note-editor-backdrop';
+    wrap.innerHTML = `
+      <div class="note-editor" style="max-width:520px">
+        <div class="ne-head">
+          <strong style="font-size:15px;font-weight:800">${link ? 'Edit Link' : 'Tambah Link Registrasi'}</strong>
+          <button class="icon-btn" id="lm-close" style="width:32px;height:32px">${icons.close}</button>
+        </div>
+        <div class="field"><label>Judul Link</label>
+          <input id="lm-title" placeholder="Contoh: Registrasi Doo Futures" value="${esc(link?.title || '')}" maxlength="120" /></div>
+        <div class="field"><label>URL Registrasi</label>
+          <input id="lm-url" placeholder="https://..." value="${esc(link?.url || '')}" /></div>
+        <div class="field"><label>Keterangan (opsional)</label>
+          <input id="lm-note" placeholder="Contoh: khusus nasabah Jakarta" value="${esc(link?.note || '')}" maxlength="300" /></div>
+        <div class="ne-actions">
+          <button class="btn btn-ghost btn-sm" id="lm-cancel">Batal</button>
+          <button class="btn btn-primary btn-sm" id="lm-save">${icons.check} Simpan</button>
+        </div>
+      </div>`;
+    document.body.appendChild(wrap);
+    wrap.querySelector('#lm-title').focus();
+    const close = () => wrap.remove();
+    wrap.querySelector('#lm-close').addEventListener('click', close);
+    wrap.querySelector('#lm-cancel').addEventListener('click', close);
+    wrap.addEventListener('click', (e) => { if (e.target === wrap) close(); });
+
+    wrap.querySelector('#lm-save').addEventListener('click', async () => {
+      const payload = {
+        title: wrap.querySelector('#lm-title').value.trim(),
+        url: wrap.querySelector('#lm-url').value.trim(),
+        note: wrap.querySelector('#lm-note').value.trim(),
+      };
+      if (!payload.title) { toast('Judul link wajib diisi', 'error'); return; }
+      if (!/^https?:\/\//i.test(payload.url)) { toast('URL harus diawali http:// atau https://', 'error'); return; }
+      try {
+        if (link) await api.patch(`/reglinks/${link.id}`, payload);
+        else await api.post('/reglinks', payload);
+        toast('Link tersimpan', 'success');
+        close();
+        await loadLinks();
+      } catch (e) { toast(e.message, 'error'); }
+    });
+  }
+
+  async function loadLinks() {
+    try {
+      links = await api.get('/reglinks');
+    } catch {
+      links = [];
+    }
+    paintLinks();
+  }
+
+  root.querySelector('#add-link').addEventListener('click', () => openLinkModal(null));
+  await loadLinks();
 }

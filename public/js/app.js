@@ -12,6 +12,8 @@ import { renderAnnouncements } from './pages/announcements.js';
 import { renderTools } from './pages/tools.js';
 import { renderAdmin } from './pages/admin.js';
 import { renderProfile } from './pages/profile.js';
+import { renderNotes } from './pages/notes.js';
+import { mountAiAssistant } from './ai.js';
 
 const ROUTES = {
   dashboard: { title: 'Dashboard', sub: 'Ringkasan performa NMI', icon: 'dashboard', render: renderDashboard, group: 'Utama' },
@@ -21,6 +23,7 @@ const ROUTES = {
   appointments: { title: 'Appointment', sub: 'Jadwal pertemuan prospek', icon: 'calendar', render: renderAppointments, group: 'Aktivitas' },
   rewards: { title: 'Reward', sub: 'Cash & traveling reward', icon: 'gift', render: renderRewards, group: 'Aktivitas' },
   announcements: { title: 'Pengumuman', sub: 'Info & berita dari admin', icon: 'megaphone', render: renderAnnouncements, group: 'Aktivitas' },
+  notes: { title: 'Catatan', sub: 'Catatan pribadi & pengingat', icon: 'edit', render: renderNotes, group: 'Aktivitas' },
   tools: { title: 'Tools Trading', sub: 'Harga, kalender, sesi & berita', icon: 'tools', render: renderTools, group: 'Trading' },
   admin: { title: 'Manajemen Marketing', sub: 'Kelola akun & akses', icon: 'users', render: renderAdmin, group: 'Admin', adminOnly: true },
   profile: { title: 'Profil', sub: 'Keanggotaan & akun', icon: 'shield', render: renderProfile, group: 'Akun' },
@@ -80,10 +83,15 @@ function shell(user) {
 
       <div class="main">
         <div class="mobile-topbar">
-          <img src="/img/logo-mark.png" alt="Entry Market" />
-          <span class="mt-title" id="mt-title">Dashboard</span>
+          <div class="mt-brand">
+            <img src="/img/logo-mark.png" alt="" class="mt-logo-mark" />
+            <img src="/img/logo-word-white.png" alt="Entry Market" class="mt-logo-word" />
+          </div>
           <span class="mt-spacer"></span>
-          <button class="icon-btn" data-route="announcements">${icons.bell}<span class="dot"></span></button>
+          <button class="icon-btn" data-route="announcements" title="Pengumuman">${icons.bell}<span class="dot"></span></button>
+          <button class="icon-btn mt-profile" data-route="profile" title="Profil">
+            <span class="mt-avatar">${initials(user.name)}</span>
+          </button>
         </div>
 
         <header class="topbar">
@@ -105,6 +113,8 @@ function shell(user) {
               <span>${ROUTES[k].title.split(' ')[0]}</span>
             </button>`).join('')}
         </nav>
+
+        <footer class="app-footer">Entry Market | PT. Sosial Grow Media Connection</footer>
       </div>
     </div>`;
 }
@@ -121,10 +131,8 @@ async function navigate(key) {
   });
   const t = document.getElementById('page-title');
   const s = document.getElementById('page-sub');
-  const mt = document.getElementById('mt-title');
   if (t) t.textContent = ROUTES[key].title;
   if (s) s.textContent = ROUTES[key].sub;
-  if (mt) mt.textContent = ROUTES[key].title;
 
   if (cleanup) { try { cleanup(); } catch {} cleanup = null; }
 
@@ -187,11 +195,7 @@ function renderLogin() {
             </div>
             <button class="btn btn-primary btn-block" type="submit" id="login-btn" style="margin-top:6px">Masuk</button>
           </form>
-          <div class="login-hint">
-            <b>Akun demo</b><br />
-            Admin: <code>admin@entrymarket.id</code> / <code>admin123</code><br />
-            Marketing: <code>rizky@entrymarket.id</code> / <code>marketing123</code>
-          </div>
+          <div class="login-copy">Entry Market | PT. Sosial Grow Media Connection</div>
         </div>
       </div>
     </div>`;
@@ -231,6 +235,7 @@ async function boot() {
   document.querySelectorAll('[data-route]').forEach((el) => {
     el.addEventListener('click', () => navigate(el.dataset.route));
   });
+  mountAiAssistant(store.user);
   await navigate(routeFromHash());
 }
 

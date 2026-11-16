@@ -8,8 +8,9 @@ export async function renderAppointments(root, ctx) {
   const state = { tab: 'upcoming' };
 
   root.innerHTML = `<div class="page">
-    <div class="card" style="margin-bottom:18px">
-      <div class="card-head" style="flex-wrap:wrap">
+    <div class="appt-stats" id="appt-stats"></div>
+    <div class="card">
+      <div class="card-head" style="flex-wrap:wrap;gap:12px">
         <div><h3>Appointment Prospek</h3><div class="hint">Jadwal pertemuan dengan calon nasabah</div></div>
         <button class="btn btn-primary btn-sm" id="add-appt">${icons.plus} Buat Jadwal</button>
       </div>
@@ -17,7 +18,7 @@ export async function renderAppointments(root, ctx) {
         <button data-tab="upcoming" class="active">Mendatang</button>
         <button data-tab="past">Riwayat</button>
       </div>
-      <div id="appt-list" style="margin-top:16px"></div>
+      <div id="appt-list" class="appt-list"></div>
     </div>
   </div>`;
 
@@ -30,31 +31,51 @@ export async function renderAppointments(root, ctx) {
       .filter((a) => (state.tab === 'upcoming' ? new Date(a.date).getTime() >= now - 86400000 : new Date(a.date).getTime() < now - 86400000))
       .sort((a, b) => (state.tab === 'upcoming' ? new Date(a.date) - new Date(b.date) : new Date(b.date) - new Date(a.date)));
 
-    page.querySelector('#appt-list').innerHTML = list.map((a) => `
-      <div class="appt">
-        <div class="appt-date">
-          <div class="d">${dayNum(a.date)}</div>
-          <div class="m">${monthShort(a.date)}</div>
+    const upcoming = all.filter((a) => new Date(a.date).getTime() >= now - 86400000);
+    const done = all.filter((a) => a.status === 'done' || a.status === 'closed');
+    page.querySelector('#appt-stats').innerHTML = `
+      <div class="appt-stat">
+        <span class="as-ico" style="background:var(--brand-soft);color:var(--brand)">${icons.calendar}</span>
+        <div><div class="as-k">Mendatang</div><div class="as-v">${upcoming.length}</div></div>
+      </div>
+      <div class="appt-stat">
+        <span class="as-ico" style="background:var(--green-soft);color:var(--green)">${icons.check}</span>
+        <div><div class="as-k">Selesai</div><div class="as-v">${done.length}</div></div>
+      </div>
+      <div class="appt-stat">
+        <span class="as-ico" style="background:var(--blue-soft);color:var(--blue)">${icons.users}</span>
+        <div><div class="as-k">Total</div><div class="as-v">${all.length}</div></div>
+      </div>`;
+
+    page.querySelector('#appt-list').innerHTML = list.map((a) => {
+      const st = APPT_STATUS[a.status] || { label: a.status, cls: 'gray' };
+      return `<article class="appt-card">
+        <div class="ac-date">
+          <span class="ac-d">${dayNum(a.date)}</span>
+          <span class="ac-m">${monthShort(a.date)}</span>
         </div>
-        <div class="appt-body">
-          <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
-            <div>
-              <strong>${esc(a.clientName)}</strong>
-              <div class="meta">
-                <span>${icons.pin} ${esc(a.location)}</span>
-                <span>${icons.clock} ${esc(a.time)} WIB</span>
-                ${isAdmin ? `<span>${icons.users} ${esc(a.marketingName)}</span>` : ''}
-              </div>
-            </div>
-            <span class="badge ${APPT_STATUS[a.status]?.cls || 'gray'}">${APPT_STATUS[a.status]?.label || a.status}</span>
+        <div class="ac-main">
+          <div class="ac-top">
+            <div class="ac-name">${esc(a.clientName)}</div>
+            <span class="badge ${st.cls}">${st.label}</span>
           </div>
-          ${a.result ? `<div class="result"><b>Hasil:</b> ${esc(a.result)}</div>` : ''}
-          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+          <div class="ac-meta">
+            <span class="ac-chip">${icons.pin}<b>${esc(a.location)}</b></span>
+            <span class="ac-chip">${icons.clock}<b>${esc(a.time)} WIB</b></span>
+            ${isAdmin ? `<span class="ac-chip">${icons.users}<b>${esc(a.marketingName)}</b></span>` : ''}
+          </div>
+          ${a.result ? `<div class="ac-result"><span>Hasil</span><p>${esc(a.result)}</p></div>` : ''}
+          <div class="ac-actions">
             <button class="btn btn-sm btn-outline" data-progress="${a.id}">${icons.edit} Update Progres</button>
-            <button class="btn btn-sm btn-ghost" data-del="${a.id}" style="color:var(--red)">${icons.trash}</button>
+            <button class="icon-btn ac-del" data-del="${a.id}" title="Hapus">${icons.trash}</button>
           </div>
         </div>
-      </div>`).join('') || `<div class="empty">${state.tab === 'upcoming' ? 'Belum ada jadwal mendatang' : 'Belum ada riwayat appointment'}</div>`;
+      </article>`;
+    }).join('') || `<div class="appt-empty">
+        <div class="ae-ico">${icons.calendar}</div>
+        <strong>${state.tab === 'upcoming' ? 'Belum ada jadwal mendatang' : 'Belum ada riwayat appointment'}</strong>
+        <span>${state.tab === 'upcoming' ? 'Tekan "Buat Jadwal" untuk menambahkan pertemuan baru' : 'Riwayat akan muncul setelah pertemuan selesai'}</span>
+      </div>`;
 
     page.querySelectorAll('[data-progress]').forEach((b) => {
       b.addEventListener('click', () => {
@@ -90,10 +111,16 @@ function openApptForm(ctx, reload) {
   openModal({
     title: 'Buat Appointment',
     body: `
-      <form id="appt-form">
+      <form id="appt-form" class="appt-form">
         ${isAdmin ? `<div class="field"><label>Marketing</label><select name="marketingId" id="appt-marketing"></select></div>` : ''}
-        <div class="field"><label>Nama Nasabah</label><input name="clientName" required placeholder="Nama calon nasabah" /></div>
-        <div class="field"><label>Lokasi Pertemuan</label><input name="location" required placeholder="Kantor / Cafe / Zoom" /></div>
+        <div class="field">
+          <label>Nama Nasabah</label>
+          <div class="input-ico">${icons.users}<input name="clientName" required placeholder="Nama calon nasabah" /></div>
+        </div>
+        <div class="field">
+          <label>Lokasi Pertemuan</label>
+          <div class="input-ico">${icons.pin}<input name="location" required placeholder="Kantor / Cafe / Zoom" /></div>
+        </div>
         <div class="field-row">
           <div class="field"><label>Tanggal</label><input name="date" type="date" value="${today}" required /></div>
           <div class="field"><label>Jam</label><input name="time" type="time" value="10:00" required /></div>
