@@ -35,7 +35,7 @@ async function buildContext(db, user) {
   ]);
 
   const s = agg[0] || { marginIn: 0, marginOut: 0, lots: 0, clients: [] };
-  return {
+  const base = {
     user: { name: user.name, role: user.role, company: user.company || 'Doo Financial Futures' },
     periode: '30 hari terakhir',
     marginIn: Math.round(s.marginIn),
@@ -47,6 +47,39 @@ async function buildContext(db, user) {
     appointment: appts,
     reward: rewards,
   };
+
+  /* Admin butuh gambaran tim: sertakan peringkat NMI semua marketing. */
+  if (isAdmin) {
+    const [teamAgg, marketers] = await Promise.all([
+      db.collection('nmi').aggregate([
+        { $match: { date: { $gte: since } } },
+        {
+          $group: {
+            _id: '$marketingId',
+            marginIn: { $sum: { $cond: [{ $eq: ['$type', 'in'] }, '$amount', 0] } },
+            marginOut: { $sum: { $cond: [{ $eq: ['$type', 'out'] }, '$amount', 0] } },
+            lots: { $sum: '$lots' },
+            clients: { $addToSet: '$clientName' },
+          },
+        },
+      ]).toArray(),
+      db.collection('users').find({ role: 'marketing' }).toArray(),
+    ]);
+    const nameById = new Map(marketers.map((m) => [String(m._id), m.name]));
+    base.leaderboard = teamAgg
+      .map((t) => ({
+        nama: nameById.get(String(t._id)) || 'Marketing',
+        nmi: Math.round(t.marginIn - t.marginOut),
+        marginIn: Math.round(t.marginIn),
+        lots: Math.round(t.lots * 10) / 10,
+        nasabah: t.clients.length,
+      }))
+      .sort((a, b) => b.nmi - a.nmi)
+      .map((t, i) => ({ peringkat: i + 1, ...t }));
+    base.totalMarketing = marketers.length;
+  }
+
+  return base;
 }
 
 /* Fallback lokal bila tidak ada API key AI: jawaban berbasis data. */
