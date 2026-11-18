@@ -2301,3 +2301,514 @@ tr.tier-achieved td { background: rgba(34, 197, 94, 0.035); }
   .calc-grid { grid-template-columns: 1fr; }
   .co-value { font-size: 28px; }
 }
+
+/* ============================================================
+   DARK THEME — karakter warna logo Entry Market (magenta #982788)
+   ============================================================ */
+:root {
+  --brand: #a8329a;
+  --brand-600: #8f2782;
+  --brand-400: #c94fba;
+  --brand-soft: rgba(168, 50, 154, 0.16);
+  --brand-glow: rgba(168, 50, 154, 0.42);
+
+  --ink: #0a0a0f;
+  --ink-2: #101017;
+  --ink-3: #16161f;
+  --ink-4: #1e1e29;
+  --line-dark: rgba(255, 255, 255, 0.07);
+
+  --white: #14141c;
+  --paper: #0a0a0f;
+  --paper-2: #1a1a24;
+  --line: rgba(255, 255, 255, 0.08);
+
+  --text: #f2f2f7;
+  --text-2: #a8a8bd;
+  --text-3: #6e6e85;
+  --text-inv: #ffffff;
+  --text-inv-2: rgba(255, 255, 255, 0.66);
+  --text-inv-3: rgba(255, 255, 255, 0.42);
+
+  --green: #34d399;
+  --green-soft: rgba(52, 211, 153, 0.14);
+  --red: #fb7185;
+  --red-soft: rgba(251, 113, 133, 0.14);
+  --amber: #fbbf24;
+  --amber-soft: rgba(251, 191, 36, 0.14);
+  --blue: #60a5fa;
+  --blue-soft: rgba(96, 165, 250, 0.14);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.6);
+}
+
+body {
+  background:
+    radial-gradient(1100px 620px at 82% -12%, rgba(168, 50, 154, 0.16), transparent 62%),
+    radial-gradient(900px 520px at 8% 4%, rgba(120, 40, 170, 0.1), transparent 60%),
+    #0a0a0f;
+  color: var(--text);
+}
+
+/* ---------- Sidebar ---------- */
+.sidebar {
+  background: linear-gradient(180deg, #12121a 0%, #0d0d13 100%);
+  border-right: 1px solid var(--line);
+}
+.sidebar-brand { border-bottom: 1px solid var(--line); }
+.sidebar-brand img { filter: brightness(0) invert(1); opacity: 0.95; }
+.sidebar-brand img:first-child { filter: none; }
+
+.nav-label { color: var(--text-3); }
+.nav-item { color: var(--text-2); }
+.nav-item:hover { background: rgba(255, 255, 255, 0.05); color: var(--text); }
+.nav-item.active {
+  background: linear-gradient(90deg, rgba(168, 50, 154, 0.28), rgba(168, 50, 154, 0.08));
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(168, 50, 154, 0.35);
+}
+.nav-item.active .nav-ico { color: var(--brand-400); }
+.nav-ico { color: var(--text-3); }
+
+.sidebar-partner {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--line);
+}
+.sidebar-partner img { filter: brightness(0) invert(1); opacity: 0.9; }
+.sidebar-partner .sp-label { color: var(--text-3); }
+.sidebar-foot { border-top: 1px solid var(--line); }
+.user-chip { background: rgba(255, 255, 255, 0.05); }
+.user-chip:hover { background: rgba(255, 255, 255, 0.09); }
+.user-chip .meta strong { color: var(--text); }
+.user-chip .meta span { color: var(--text-3); }
+
+/* ---------- Topbar ---------- */
+.topbar {
+  background: rgba(10, 10, 15, 0.82);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--line);
+}
+.topbar h2 { color: var(--text); }
+.topbar .sub { color: var(--text-3); }
+.icon-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--line);
+  color: var(--text-2);
+}
+.icon-btn:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+
+/* ---------- Cards ---------- */
+.card {
+  background: linear-gradient(170deg, #15151e 0%, #111119 100%);
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+.card.dark {
+  background:
+    radial-gradient(700px 320px at 88% -20%, rgba(168, 50, 154, 0.28), transparent 62%),
+    linear-gradient(165deg, #17111f, #0b0b11);
+  border-color: rgba(168, 50, 154, 0.22);
+}
+.card-head h3 { color: var(--text); }
+.card-head .hint { color: var(--text-3); }
+
+.stat {
+  background: linear-gradient(170deg, #15151e 0%, #111119 100%);
+  border: 1px solid var(--line);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+.stat .k { color: var(--text-3); }
+.stat .v { color: var(--text); }
+.stat .d { color: var(--text-3); }
+
+/* ---------- Hero ---------- */
+.hero {
+  background:
+    radial-gradient(760px 380px at 88% -18%, rgba(168, 50, 154, 0.34), transparent 60%),
+    radial-gradient(560px 300px at 6% 108%, rgba(96, 40, 170, 0.22), transparent 62%),
+    linear-gradient(160deg, #17111f 0%, #0a0a10 100%);
+  border: 1px solid rgba(168, 50, 154, 0.2);
+}
+.hero-cell { background: rgba(255, 255, 255, 0.045); border: 1px solid rgba(255, 255, 255, 0.07); }
+.hero-cell .k { color: var(--text-inv-3); }
+.hero-cell .v { color: #fff; }
+
+/* ---------- Buttons ---------- */
+.btn-primary {
+  background: linear-gradient(135deg, var(--brand-400), var(--brand));
+  box-shadow: 0 8px 22px var(--brand-glow);
+}
+.btn-primary:hover { background: linear-gradient(135deg, #d05cc0, var(--brand-600)); }
+.btn-dark { background: rgba(255, 255, 255, 0.08); color: #fff; border: 1px solid var(--line); }
+.btn-dark:hover { background: rgba(255, 255, 255, 0.14); }
+.btn-ghost { background: rgba(255, 255, 255, 0.06); color: var(--text); }
+.btn-ghost:hover { background: rgba(255, 255, 255, 0.11); }
+.btn-outline { border-color: var(--line); color: var(--text-2); }
+.btn-outline:hover { border-color: var(--brand-400); color: var(--brand-400); }
+.btn-glass { background: rgba(255, 255, 255, 0.07); border: 1px solid var(--line); color: #fff; }
+
+/* ---------- Forms ---------- */
+input, select, textarea {
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid var(--line);
+  color: var(--text);
+}
+input::placeholder, textarea::placeholder { color: var(--text-3); }
+input:focus, select:focus, textarea:focus {
+  border-color: var(--brand-400);
+  box-shadow: 0 0 0 3px rgba(168, 50, 154, 0.16);
+}
+select option { background: #16161f; color: var(--text); }
+.field label { color: var(--text-2); }
+
+/* ---------- Tables ---------- */
+table { color: var(--text); }
+thead th {
+  color: var(--text-3);
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+}
+tbody td { border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+tbody tr:hover { background: transparent; }
+tbody tr:hover td { background: rgba(255, 255, 255, 0.03); }
+.table-wrap { border-color: var(--line); }
+
+/* ---------- Badges & chips ---------- */
+.badge.gray { background: rgba(255, 255, 255, 0.08); color: var(--text-2); }
+.badge.green { background: var(--green-soft); color: var(--green); }
+.badge.amber { background: var(--amber-soft); color: var(--amber); }
+.badge.red { background: var(--red-soft); color: var(--red); }
+.badge.blue { background: var(--blue-soft); color: var(--blue); }
+.chip { background: rgba(255, 255, 255, 0.06); color: var(--text-2); border: 1px solid var(--line); }
+
+/* ---------- Progress ---------- */
+.progress { background: rgba(255, 255, 255, 0.08); }
+.progress i { background: linear-gradient(90deg, var(--brand-400), var(--brand)); }
+
+/* ---------- Segmented ---------- */
+.seg { background: rgba(255, 255, 255, 0.05); border: 1px solid var(--line); }
+.seg button { color: var(--text-3); }
+.seg button.active { background: rgba(255, 255, 255, 0.12); color: #fff; box-shadow: none; }
+
+/* ---------- Empty & skeleton ---------- */
+.empty { color: var(--text-3); }
+.skeleton {
+  background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.09) 37%, rgba(255,255,255,0.04) 63%);
+  background-size: 400% 100%;
+}
+
+/* ---------- Modal ---------- */
+.modal-backdrop { background: rgba(5, 5, 9, 0.72); }
+.modal {
+  background: linear-gradient(170deg, #17171f, #101017);
+  border: 1px solid var(--line);
+  color: var(--text);
+}
+.modal h3 { color: var(--text); }
+
+/* ---------- Toast ---------- */
+.toast {
+  background: #1b1b25;
+  border: 1px solid var(--line);
+  color: var(--text);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+}
+
+/* ---------- Login ---------- */
+.login-wrap { background: #08080c; }
+.login-panel { background: #0d0d13; border-left: 1px solid var(--line); }
+.login-card {
+  background: linear-gradient(170deg, #16161f, #101017);
+  border: 1px solid var(--line);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+}
+.login-card h1 { color: var(--text); }
+.login-card p { color: var(--text-3); }
+.login-copy { color: var(--text-3); }
+
+/* ---------- Mobile ---------- */
+.mobile-topbar {
+  background: rgba(10, 10, 15, 0.9);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--line);
+}
+.bottom-nav {
+  background: rgba(13, 13, 19, 0.94);
+  backdrop-filter: blur(16px);
+  border-top: 1px solid var(--line);
+}
+.bn-item { color: var(--text-3); }
+.bn-item.active { color: var(--brand-400); }
+.app-footer { color: var(--text-3); border-top: 1px solid var(--line); }
+
+/* ---------- Notes / reglinks / calc / appt ---------- */
+.notes-search input { background: rgba(255, 255, 255, 0.045); }
+.note-card {
+  background: linear-gradient(170deg, #17171f, #12121a);
+  border-color: var(--line);
+}
+.note-card.note-amber { background: linear-gradient(170deg, #2a2210, #1c1708); border-color: rgba(251, 191, 36, 0.28); }
+.note-card.note-green { background: linear-gradient(170deg, #0f2419, #0a1a12); border-color: rgba(52, 211, 153, 0.26); }
+.note-card.note-blue { background: linear-gradient(170deg, #101d2e, #0b1420); border-color: rgba(96, 165, 250, 0.26); }
+.note-card.note-rose { background: linear-gradient(170deg, #2a1018, #1c0a10); border-color: rgba(251, 113, 133, 0.26); }
+.note-card p { color: var(--text-2); }
+.note-editor { background: linear-gradient(170deg, #17171f, #101017); border: 1px solid var(--line); }
+.note-editor textarea { background: rgba(255, 255, 255, 0.045); }
+.ne-color { border-color: var(--line); }
+.ne-color.active { border-color: var(--brand-400); }
+.notes-empty .ne-ico, .appt-empty .ae-ico { background: rgba(255, 255, 255, 0.06); }
+
+.reglink { border-bottom-color: var(--line); }
+.rl-url { color: var(--blue); }
+
+.closing-sum {
+  background: linear-gradient(135deg, rgba(168, 50, 154, 0.14), rgba(168, 50, 154, 0.04));
+  border-color: rgba(168, 50, 154, 0.24);
+}
+.cs-v { color: var(--text); }
+.cs-next b { color: var(--brand-400); }
+tr.tier-achieved td { background: rgba(52, 211, 153, 0.06); }
+tr.tier-achieved:hover td { background: rgba(52, 211, 153, 0.1); }
+
+.appt-stat { background: linear-gradient(170deg, #15151e, #111119); border-color: var(--line); }
+.appt-card { background: linear-gradient(170deg, #15151e, #111119); border-color: var(--line); }
+.appt-card:hover { border-color: rgba(168, 50, 154, 0.35); }
+.ac-name { color: var(--text); }
+.ac-chip { background: rgba(255, 255, 255, 0.06); color: var(--text-2); }
+.ac-result { background: rgba(255, 255, 255, 0.05); border-left-color: var(--brand-400); }
+.ac-result p { color: var(--text-2); }
+
+.calc-detail { background: linear-gradient(170deg, #15151e, #111119); border-color: var(--line); }
+.cd-row { border-bottom-color: rgba(255, 255, 255, 0.05); }
+.cd-row b { color: var(--text); }
+.calc-empty { background: rgba(255, 255, 255, 0.03); border-color: var(--line); }
+.calc-side { background: rgba(255, 255, 255, 0.05); }
+.calc-side button.active { background: rgba(255, 255, 255, 0.12); color: #fff; }
+
+/* ---------- Tools ---------- */
+.tools-tab { background: rgba(255, 255, 255, 0.05); border-color: var(--line); color: var(--text-2); }
+.tools-tab:hover { border-color: rgba(168, 50, 154, 0.4); color: #fff; }
+.tools-tab.active {
+  background: linear-gradient(135deg, var(--brand-400), var(--brand));
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 8px 22px var(--brand-glow);
+}
+.cal-day-btn { background: rgba(255, 255, 255, 0.05); border-color: var(--line); }
+.cal-day-btn .cd-num { color: var(--text); }
+.cal-day-btn.active { background: linear-gradient(135deg, var(--brand-400), var(--brand)); border-color: transparent; }
+.cal-impacts button { background: rgba(255, 255, 255, 0.05); border-color: var(--line); color: var(--text-2); }
+.cal-impacts button.active { background: rgba(255, 255, 255, 0.12); color: #fff; }
+.cal-head { color: var(--text-3); border-bottom-color: var(--line); }
+.cal-row { border-bottom-color: rgba(255, 255, 255, 0.05); }
+.cal-row:hover { background: rgba(255, 255, 255, 0.03); }
+.cr-event { color: var(--text); }
+.cr-cur { background: rgba(255, 255, 255, 0.07); color: var(--text-2); }
+.cr-val { color: var(--text-3); }
+.cr-val.actual { color: var(--text); }
+.cr-val.forecast { color: var(--blue); }
+.cal-row .cr-val { background: rgba(255, 255, 255, 0.05); }
+.cal-row .cr-val.actual { background: rgba(52, 211, 153, 0.1); }
+.cal-row .cr-val.forecast { background: rgba(96, 165, 250, 0.1); }
+.cr-time { color: var(--text); background: rgba(255, 255, 255, 0.06); }
+
+.news-cat { background: rgba(255, 255, 255, 0.05); border-color: var(--line); color: var(--text-2); }
+.news-cat.active { background: linear-gradient(135deg, var(--brand-400), var(--brand)); border-color: transparent; color: #fff; }
+.news-item { border-bottom-color: var(--line); }
+.news-item h4 a { color: var(--text); }
+.news-item p { color: var(--text-2); }
+.news-tag { background: var(--brand-soft); color: var(--brand-400); }
+
+.session { background: rgba(255, 255, 255, 0.04); border-color: var(--line); }
+.session.open { background: rgba(52, 211, 153, 0.07); border-color: rgba(52, 211, 153, 0.3); }
+.session .info strong { color: var(--text); }
+.session-note { background: rgba(255, 255, 255, 0.04); color: var(--text-2); }
+.sb-track { background: rgba(255, 255, 255, 0.07); }
+.sb-fill { background: rgba(255, 255, 255, 0.18); }
+.sb-fill.open { background: linear-gradient(90deg, var(--brand), var(--brand-400)); }
+.sb-name { color: var(--text-2); }
+
+/* ---------- AI panel ---------- */
+.ai-panel { background: #12121a; border-color: var(--line); }
+.ai-body { background: #0d0d13; }
+.ai-assistant .ai-bubble { background: rgba(255, 255, 255, 0.06); border-color: var(--line); color: var(--text); }
+.ai-form { background: #12121a; border-top-color: var(--line); }
+.ai-form textarea { background: rgba(255, 255, 255, 0.05); }
+.ai-chip { background: rgba(255, 255, 255, 0.05); border-color: var(--line); color: var(--text-2); }
+.ai-chip:hover { border-color: var(--brand-400); color: var(--brand-400); }
+
+/* ---------- Reward covers ---------- */
+.req-list li { color: var(--text-inv-2) !important; }
+.prog-row span { color: var(--text-inv-3) !important; }
+
+/* ---------- Scrollbar ---------- */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.12); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+
+/* ============================================================
+   FIX PASS — kontras, ukuran ikon, komponen gelap yang terlewat
+   ============================================================ */
+
+/* ---------- Ukuran ikon di dalam tombol (fix ikon membesar) ---------- */
+.btn svg { width: 16px; height: 16px; flex: 0 0 16px; }
+.btn-sm svg { width: 14px; height: 14px; flex: 0 0 14px; }
+.btn-block svg { width: 16px; height: 16px; flex: 0 0 16px; }
+.icon-btn svg { width: 18px; height: 18px; flex: 0 0 18px; }
+.calc-actions .btn svg { width: 16px; height: 16px; flex: 0 0 16px; }
+.modal-foot .btn svg { width: 16px; height: 16px; flex: 0 0 16px; }
+.tools-tab svg { width: 16px; height: 16px; flex: 0 0 16px; }
+.seg button svg { width: 14px; height: 14px; flex: 0 0 14px; }
+.badge svg, .chip svg { width: 12px; height: 12px; flex: 0 0 12px; }
+
+/* ---------- Leads: kanban & kartu (sebelumnya putih) ---------- */
+.kcol { background: rgba(255, 255, 255, 0.03); border: 1px solid var(--line); }
+.kcol-head span {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--line);
+  color: var(--text-2);
+}
+.kcard {
+  background: linear-gradient(170deg, #17171f, #12121a);
+  border-color: var(--line);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+}
+.kcard:hover {
+  border-color: rgba(168, 50, 154, 0.45);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
+}
+.kcard strong { color: var(--text); }
+.kcard .sub { color: var(--text-3); }
+.kcard .amt { color: var(--brand-400); }
+
+/* ---------- Appointment & pengumuman (sebelumnya putih) ---------- */
+.appt {
+  background: linear-gradient(170deg, #17171f, #12121a);
+  border-color: var(--line);
+}
+.appt-body strong { color: var(--text); }
+.appt-body .meta { color: var(--text-3); }
+.appt-body .result { background: rgba(255, 255, 255, 0.05); color: var(--text-2); }
+.appt-date { background: rgba(255, 255, 255, 0.08); color: var(--text); }
+.appt-date .m { color: var(--text-3); }
+
+.ann {
+  background: linear-gradient(170deg, #17171f, #12121a);
+  border-color: var(--line);
+}
+.ann.pinned {
+  background: linear-gradient(180deg, rgba(168, 50, 154, 0.14), rgba(23, 23, 31, 0.9) 60%);
+  border-color: rgba(168, 50, 154, 0.32);
+}
+.ann-head h4 { color: var(--text); }
+.ann p { color: var(--text-2); }
+.ann .when { color: var(--text-3); }
+
+/* ---------- Login hint code ---------- */
+.login-hint code { background: rgba(255, 255, 255, 0.08); color: var(--text); }
+
+/* ---------- Hover state: jaga teks tetap terang ---------- */
+.cal-day-btn:hover { border-color: rgba(168, 50, 154, 0.45); }
+.cal-impacts button:hover { border-color: rgba(168, 50, 154, 0.45); color: var(--text); }
+.note-card:hover { border-color: rgba(168, 50, 154, 0.4); box-shadow: 0 14px 34px rgba(0, 0, 0, 0.45); }
+.note-card.note-amber:hover { border-color: rgba(251, 191, 36, 0.5); }
+.note-card.note-green:hover { border-color: rgba(52, 211, 153, 0.5); }
+.note-card.note-blue:hover { border-color: rgba(96, 165, 250, 0.5); }
+.note-card.note-rose:hover { border-color: rgba(251, 113, 133, 0.5); }
+.note-top h4 { color: var(--text); }
+.note-card p { color: var(--text-2); }
+.note-card .note-foot { color: var(--text-3); }
+.ne-color.note-amber { background: #fbbf24; }
+.ne-color.note-green { background: #34d399; }
+.ne-color.note-blue { background: #60a5fa; }
+.ne-color.note-rose { background: #fb7185; }
+
+/* ---------- Tabel: baris hover tetap terbaca ---------- */
+tbody tr:hover td { color: var(--text); }
+tbody tr:hover td .cell-user span { color: var(--text-3); }
+
+/* ---------- Segmented & tab aktif ---------- */
+.seg button.active { color: #fff; }
+.cal-impacts button.active { color: #fff; }
+.calc-side button.active { color: #fff; }
+.calc-side button[data-side="buy"].active { color: #34d399; }
+.calc-side button[data-side="sell"].active { color: #fb7185; }
+
+/* ---------- Mobile: kartu & panel tetap gelap ---------- */
+@media (max-width: 760px) {
+  .card { background: linear-gradient(170deg, #15151e 0%, #111119 100%); }
+  .card.dark { background: radial-gradient(700px 320px at 88% -20%, rgba(168, 50, 154, 0.28), transparent 62%), linear-gradient(165deg, #17111f, #0b0b11); }
+  .kcard { background: linear-gradient(170deg, #17171f, #12121a); }
+  .ann, .appt { background: linear-gradient(170deg, #17171f, #12121a); }
+  .cal-row .cr-val.actual { background: rgba(52, 211, 153, 0.12); }
+  .cal-row .cr-val.forecast { background: rgba(96, 165, 250, 0.12); }
+}
+
+/* ---------- Login mobile: brand + deskripsi ---------- */
+.login-mobile-brand { display: none; }
+@media (max-width: 900px) {
+  .login-panel { flex-direction: column; justify-content: flex-start; gap: 26px; padding: 40px 22px 48px; }
+  .login-mobile-brand {
+    display: block;
+    width: 100%;
+    max-width: 396px;
+    text-align: center;
+  }
+  .login-mobile-brand .lmb-logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 18px;
+  }
+  .login-mobile-brand .lmb-logo img:first-child { height: 40px; width: auto; }
+  .login-mobile-brand .lmb-logo img:last-child { height: 26px; width: auto; filter: brightness(0) invert(1); }
+  .login-mobile-brand h2 {
+    margin: 0 0 10px;
+    font-size: 21px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1.25;
+    color: var(--text);
+  }
+  .login-mobile-brand h2 em {
+    font-style: normal;
+    background: linear-gradient(100deg, #d76bc7, #a8329a 60%, #6f1a63);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .login-mobile-brand p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.65;
+    color: var(--text-3);
+  }
+  .login-card { max-width: 396px; }
+}
+
+/* ---------- Broker logo preview (profil admin) ---------- */
+.broker-logo-preview {
+  width: 132px;
+  height: 76px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.05);
+  display: grid;
+  place-items: center;
+  padding: 10px;
+  overflow: hidden;
+}
+.broker-logo-preview img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  filter: brightness(0) invert(1);
+  opacity: 0.92;
+}
+
+/* Logo partner hasil upload admin: jangan di-invert */
+.sidebar-partner img.custom { filter: none; opacity: 1; }

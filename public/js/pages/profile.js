@@ -18,19 +18,19 @@ export async function renderProfile(root, ctx) {
           <h1 style="margin:0 0 4px;font-size:24px;font-weight:800;letter-spacing:-.03em;color:#fff">${esc(me.name)}</h1>
           <div style="font-size:13px;color:rgba(255,255,255,.6)">${esc(me.email)}</div>
         </div>
-        <div style="text-align:right;display:flex;flex-direction:column;gap:10px;align-items:flex-end">
+        ${me.role !== 'admin' ? `<div style="text-align:right;display:flex;flex-direction:column;gap:10px;align-items:flex-end">
           <div style="display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:12px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12)">
             <span style="width:26px;height:26px;display:inline-flex;color:#fff">${icons.building}</span>
             <div style="text-align:left">
               <div style="font-size:10px;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:.08em;font-weight:700">Broker</div>
-              <div style="font-size:13px;font-weight:800;color:#fff">${esc(me.company)}</div>
+              <div style="font-size:13px;font-weight:800;color:#fff">${esc(ctx.settings?.brokerName || me.company)}</div>
             </div>
           </div>
           <div style="display:inline-flex;align-items:center;gap:9px;padding:7px 13px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1)">
-            <img src="/img/partner-doo-white.png" alt="Doo Financial Futures" style="height:26px;width:auto" />
+            <img src="${ctx.settings?.logo('white') || '/img/partner-doo-white.png'}" alt="${esc(ctx.settings?.brokerName || me.company)}" style="height:26px;width:auto;max-width:120px;object-fit:contain" />
             <span style="font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.45);line-height:1.3;text-align:left">Official<br />Partner</span>
           </div>
-        </div>
+        </div>` : ''}
       </div>
 
       <div class="hero-grid" style="margin-top:24px">
@@ -70,6 +70,32 @@ export async function renderProfile(root, ctx) {
         Untuk mengubah nama, nomor HP, atau password, hubungi admin Entry Market.
       </p>
     </div>
+
+    ${me.role === 'admin' ? `<div class="card" style="margin-top:18px">
+      <div class="card-head">
+        <div><h3>Broker Partner</h3><div class="hint">Nama & logo partner yang tampil di dashboard sales</div></div>
+      </div>
+      <div class="field"><label>Nama Broker Partner</label>
+        <input id="broker-name" value="${esc(ctx.settings?.brokerName || '')}" placeholder="Doo Financial Futures" maxlength="120" /></div>
+      <div class="field"><label>Logo Broker Partner (PNG / JPG)</label>
+        <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+          <div class="broker-logo-preview" id="broker-preview">
+            ${ctx.settings?.brokerLogo
+              ? `<img src="${ctx.settings.brokerLogo}" alt="logo" />`
+              : `<img src="/img/partner-doo.png" alt="logo" />`}
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <label class="btn btn-ghost btn-sm" style="cursor:pointer">
+              ${icons.upload} Pilih Logo
+              <input type="file" id="broker-file" accept="image/png,image/jpeg" hidden />
+            </label>
+            <button class="btn btn-ghost btn-sm" id="broker-clear">${icons.trash} Hapus</button>
+          </div>
+        </div>
+        <div class="hint" style="margin-top:8px">Format PNG atau JPG, maksimal 1 MB. Disarankan latar transparan.</div>
+      </div>
+      <button class="btn btn-primary" id="broker-save">${icons.check} Simpan Broker Partner</button>
+    </div>` : ''}
 
     <div class="copyright">Entry Market | PT. Sosial Grow Media Connection</div>
   </div>`;
@@ -188,4 +214,41 @@ export async function renderProfile(root, ctx) {
 
   root.querySelector('#add-link').addEventListener('click', () => openLinkModal(null));
   await loadLinks();
+
+  /* ---------- Broker partner (admin) ---------- */
+  if (me.role === 'admin') {
+    let pendingLogo = null;
+
+    root.querySelector('#broker-file').addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (file.size > 1024 * 1024) { toast('Ukuran logo maksimal 1 MB', 'error'); return; }
+      if (!['image/png', 'image/jpeg'].includes(file.type)) { toast('Format logo harus PNG atau JPG', 'error'); return; }
+      const fr = new FileReader();
+      fr.onload = () => {
+        pendingLogo = String(fr.result);
+        root.querySelector('#broker-preview').innerHTML = `<img src="${pendingLogo}" alt="logo" />`;
+      };
+      fr.onerror = () => toast('Logo gagal dibaca', 'error');
+      fr.readAsDataURL(file);
+    });
+
+    root.querySelector('#broker-clear').addEventListener('click', () => {
+      pendingLogo = '';
+      root.querySelector('#broker-preview').innerHTML = `<img src="/img/partner-doo.png" alt="logo" />`;
+    });
+
+    root.querySelector('#broker-save').addEventListener('click', async () => {
+      const body = { brokerName: root.querySelector('#broker-name').value.trim() };
+      if (pendingLogo !== null) body.brokerLogo = pendingLogo;
+      try {
+        const saved = await api.patch('/settings', body);
+        ctx.settings.brokerName = saved.brokerName;
+        ctx.settings.brokerLogo = saved.brokerLogo;
+        ctx.refreshPartner?.();
+        pendingLogo = null;
+        toast('Broker partner diperbarui', 'success');
+      } catch (e) { toast(e.message, 'error'); }
+    });
+  }
 }

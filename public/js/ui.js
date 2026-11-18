@@ -60,7 +60,7 @@ export function confirmDialog(message, onConfirm, { danger = true, confirmText =
 }
 
 /** Line/area chart drawn as inline SVG. */
-export function areaChart(data, { height = 150, color = '#982788', id = 'c' } = {}) {
+export function areaChart(data, { height = 150, color = '#c94fba', id = 'c' } = {}) {
   if (!data.length) return `<div class="empty">Belum ada data</div>`;
   const w = 640;
   const h = height;
@@ -98,7 +98,7 @@ export function areaChart(data, { height = 150, color = '#982788', id = 'c' } = 
   </svg>`;
 }
 
-export function barChart(data, { height = 140, color = '#982788' } = {}) {
+export function barChart(data, { height = 140, color = '#c94fba' } = {}) {
   if (!data.length) return `<div class="empty">Belum ada data</div>`;
   const max = Math.max(...data.map((d) => d.value), 1);
   return `<div style="display:flex;align-items:flex-end;gap:6px;height:${height}px;padding-top:8px">

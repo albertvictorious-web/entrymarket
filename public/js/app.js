@@ -15,6 +15,27 @@ import { renderProfile } from './pages/profile.js';
 import { renderNotes } from './pages/notes.js';
 import { mountAiAssistant } from './ai.js';
 
+/** Pengaturan broker partner — diisi admin, dipakai di sidebar & profil. */
+export const settings = {
+  brokerName: 'Doo Financial Futures',
+  brokerLogo: '',
+  async load() {
+    try {
+      const s = await api.get('/settings');
+      this.brokerName = s.brokerName || this.brokerName;
+      this.brokerLogo = s.brokerLogo || '';
+    } catch (e) {
+      toast(`Pengaturan partner tidak dapat dimuat: ${e.message}`, 'error');
+    }
+    return this;
+  },
+  /** Logo partner: pakai upload admin bila ada, jika tidak pakai aset bawaan. */
+  logo(variant = 'color') {
+    if (this.brokerLogo) return this.brokerLogo;
+    return variant === 'white' ? '/img/partner-doo-white.png' : '/img/partner-doo.png';
+  },
+};
+
 const ROUTES = {
   dashboard: { title: 'Dashboard', sub: 'Ringkasan performa NMI', icon: 'dashboard', render: renderDashboard, group: 'Utama' },
   nmi: { title: 'NMI', sub: 'Net Margin In & riwayat transaksi', icon: 'nmi', render: renderNmi, group: 'Utama' },
@@ -68,10 +89,10 @@ function shell(user) {
               </button>`).join('')}
           `).join('')}
         </nav>
-        <div class="sidebar-partner">
-          <img src="/img/partner-doo.png" alt="Doo Financial Futures" />
+        ${user.role !== 'admin' ? `<div class="sidebar-partner">
+          <img src="${settings.logo('color')}" alt="${esc(settings.brokerName)}" class="${settings.brokerLogo ? 'custom' : 'is-default'}" />
           <span class="sp-label">Official<br />Partner</span>
-        </div>
+        </div>` : ''}
         <div class="sidebar-foot">
           <button class="user-chip" data-route="profile">
             <div class="avatar">${initials(user.name)}</div>
@@ -142,6 +163,16 @@ async function navigate(key) {
     user: store.user,
     navigate,
     logout,
+    settings,
+    refreshPartner: () => {
+      const img = document.querySelector('.sidebar-partner img');
+      if (img) {
+        img.src = settings.logo('color');
+        img.alt = settings.brokerName;
+        img.classList.toggle('custom', Boolean(settings.brokerLogo));
+        img.classList.toggle('is-default', !settings.brokerLogo);
+      }
+    },
     onCleanup: (fn) => { cleanup = fn; },
   };
   try {
@@ -170,10 +201,6 @@ function renderLogin() {
           <h2 class="login-headline">Trade Beyond <em>Limits</em></h1>
           <p class="login-sub">Platform dashboard marketing Entry Market — pantau NMI, kelola leads, jadwalkan appointment, dan raih reward traveling.</p>
         </div>
-        <div class="login-partner">
-          <img src="/img/partner-doo-white.png" alt="Doo Financial Futures" />
-          <span class="lp-label">Broker<br />Partner</span>
-        </div>
         <div class="login-stats">
           <div><strong>NMI</strong><span>Net Margin In</span></div>
           <div><strong>Leads</strong><span>Pipeline Prospek</span></div>
@@ -181,6 +208,14 @@ function renderLogin() {
         </div>
       </div>
       <div class="login-panel">
+        <div class="login-mobile-brand">
+          <div class="lmb-logo">
+            <img src="/img/logo-mark.png" alt="Entry Market" />
+            <img src="/img/logo-word-white.png" alt="entry market" />
+          </div>
+          <h2>Selamat datang di platform <em>dashboard kerja</em> anda</h2>
+          <p>Kelola informasi, alur kerja, AI, semua ada di satu tempat.</p>
+        </div>
         <div class="login-card">
           <h1>Masuk ke Dashboard</h1>
           <p>Gunakan akun marketing atau admin Anda.</p>
@@ -231,6 +266,7 @@ async function boot() {
     renderLogin();
     return;
   }
+  await settings.load();
   app.innerHTML = shell(store.user);
   document.querySelectorAll('[data-route]').forEach((el) => {
     el.addEventListener('click', () => navigate(el.dataset.route));

@@ -12,13 +12,14 @@ import marketRoutes from './routes/market.js';
 import noteRoutes from './routes/notes.js';
 import regLinkRoutes from './routes/reglinks.js';
 import aiRoutes from './routes/ai.js';
+import settingsRoutes from './routes/settings.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export function createApp() {
   const app = express();
 
-  app.use(express.json({ limit: '1mb' }));
+  app.use(express.json({ limit: '6mb' }));
   app.use(express.static(path.join(__dirname, '..', 'public')));
 
   app.get('/api/health', (req, res) => res.json({ ok: true, service: 'entrymarket-dashboard' }));
@@ -35,6 +36,7 @@ export function createApp() {
   app.use('/api/notes', noteRoutes);
   app.use('/api/reglinks', regLinkRoutes);
   app.use('/api/ai', aiRoutes);
+  app.use('/api/settings', settingsRoutes);
 
   app.use('/api', (req, res) => res.status(404).json({ error: 'Endpoint tidak ditemukan' }));
 

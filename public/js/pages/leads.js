@@ -21,7 +21,9 @@ export async function renderLeads(root, ctx) {
             <button data-view="kanban" class="active">Kanban</button>
             <button data-view="table">Tabel</button>
           </div>
-          <button class="btn btn-primary btn-sm" id="add-lead">${icons.plus} Lead Baru</button>
+          ${isAdmin ? `<button class="btn btn-ghost btn-sm" id="import-lead">${icons.upload} Import</button>
+          <button class="btn btn-ghost btn-sm" id="distribute-lead">${icons.users} Bagi Rata</button>` : ''}
+          <button class="btn btn-primary btn-sm" id="add-lead">${icons.plus} ${isAdmin ? 'Tambah Leads' : 'Lead Baru'}</button>
         </div>
       </div>
       ${isAdmin ? `<div class="field" style="margin:0;max-width:260px">
@@ -56,6 +58,7 @@ export async function renderLeads(root, ctx) {
               <div class="kcard" data-lead="${l.id}">
                 <strong>${esc(l.clientName)}</strong>
                 <div class="sub">${esc(l.source)} · ${esc(l.marketingName)}</div>
+                ${l.address ? `<div class="sub" style="margin-top:4px">${icons.pin} ${esc(l.address)}</div>` : ''}
                 <div class="foot">
                   <span class="amt">${fmtUSD(l.potential)}</span>
                   <span style="font-size:11px;color:var(--text-3)">${fmtDate(l.updatedAt, { year: undefined })}</span>
@@ -67,18 +70,19 @@ export async function renderLeads(root, ctx) {
     } else {
       body.innerHTML = `<div class="table-wrap">
         <table>
-          <thead><tr><th>Nasabah</th><th>Marketing</th><th>Sumber</th><th>Status</th><th class="num">Potensi</th><th>Update</th></tr></thead>
+          <thead><tr><th>Nasabah</th><th>Marketing</th><th>Alamat</th><th>Sumber</th><th>Status</th><th class="num">Potensi</th><th>Update</th></tr></thead>
           <tbody>
             ${leads.map((l) => `
               <tr data-lead="${l.id}" style="cursor:pointer">
                 <td><div class="cell-user"><div class="avatar sm">${initials(l.clientName)}</div>
                   <div><strong>${esc(l.clientName)}</strong><span>${esc(l.phone || '—')}</span></div></div></td>
                 <td>${esc(l.marketingName)}</td>
+                <td style="font-size:12.5px;color:var(--text-2);max-width:220px">${esc(l.address || '—')}</td>
                 <td>${esc(l.source)}</td>
                 <td><span class="badge ${LEAD_STATUS[l.status].cls}">${LEAD_STATUS[l.status].label}</span></td>
                 <td class="num">${fmtUSD(l.potential)}</td>
                 <td style="color:var(--text-3);font-size:12.5px">${fmtDate(l.updatedAt)}</td>
-              </tr>`).join('') || '<tr><td colspan="6"><div class="empty">Belum ada leads</div></td></tr>'}
+              </tr>`).join('') || '<tr><td colspan="7"><div class="empty">Belum ada leads</div></td></tr>'}
           </tbody>
         </table>
       </div>`;
@@ -87,7 +91,7 @@ export async function renderLeads(root, ctx) {
     body.querySelectorAll('[data-lead]').forEach((el) => {
       el.addEventListener('click', () => {
         const lead = leads.find((l) => l.id === el.dataset.lead);
-        openLeadDetail(lead, ctx, load);
+        openLeadDetail(lead, ctx, marketers, load);
       });
     });
   }
@@ -102,10 +106,26 @@ export async function renderLeads(root, ctx) {
 
   page.querySelector('#add-lead').addEventListener('click', () => openLeadForm(ctx, marketers, load));
 
+  page.querySelector('#import-lead')?.addEventListener('click', () => openImport(load));
+
+  page.querySelector('#distribute-lead')?.addEventListener('click', () => {
+    confirmDialog(
+      'Bagikan semua leads secara merata ke seluruh marketing aktif?',
+      async () => {
+        try {
+          const r = await api.post('/leads/distribute', {});
+          toast(`${r.total} leads dibagi rata ke ${r.marketers} marketing`, 'success');
+          load();
+        } catch (e) { toast(e.message, 'error'); }
+      },
+      { danger: false, confirmText: 'Bagi Rata' },
+    );
+  });
+
   await load();
 }
 
-function openLeadDetail(lead, ctx, reload) {
+function openLeadDetail(lead, ctx, marketers, reload) {
   const isAdmin = ctx.user.role === 'admin';
   openModal({
     title: 'Detail Lead',
@@ -117,6 +137,12 @@ function openLeadDetail(lead, ctx, reload) {
           <span style="font-size:12.5px;color:var(--text-3)">${esc(lead.phone || '—')} · ${esc(lead.source)}</span>
         </div>
       </div>
+      ${lead.address ? `<div class="field"><label>Alamat</label>
+        <div style="font-size:13px;color:var(--text-2);line-height:1.6">${esc(lead.address)}</div></div>` : ''}
+      ${isAdmin ? `<div class="field"><label>Marketing</label>
+        <select id="lead-marketing">
+          ${marketers.map((m) => `<option value="${m.id}" ${m.id === lead.marketingId ? 'selected' : ''}>${esc(m.name)}</option>`).join('')}
+        </select></div>` : ''}
       <div class="field"><label>Status Progres</label>
         <select id="lead-status">
           ${Object.entries(LEAD_STATUS).map(([k, v]) => `<option value="${k}" ${lead.status === k ? 'selected' : ''}>${v.label}</option>`).join('')}
@@ -138,11 +164,14 @@ function openLeadDetail(lead, ctx, reload) {
     onMount: (modal, close) => {
       modal.querySelector('#save-lead').addEventListener('click', async () => {
         try {
-          await api.patch(`/leads/${lead.id}`, {
+          const body = {
             status: modal.querySelector('#lead-status').value,
             potential: Number(modal.querySelector('#lead-potential').value),
             note: modal.querySelector('#lead-note').value,
-          });
+          };
+          const mk = modal.querySelector('#lead-marketing');
+          if (mk) body.marketingId = mk.value;
+          await api.patch(`/leads/${lead.id}`, body);
           toast('Progres lead diperbarui', 'success');
           close();
           reload();
@@ -163,7 +192,7 @@ function openLeadDetail(lead, ctx, reload) {
 function openLeadForm(ctx, marketers, reload) {
   const isAdmin = ctx.user.role === 'admin';
   openModal({
-    title: 'Lead Baru',
+    title: isAdmin ? 'Tambah Leads' : 'Lead Baru',
     body: `
       <form id="lead-form">
         ${isAdmin ? `<div class="field"><label>Bagikan ke Marketing</label>
@@ -177,6 +206,8 @@ function openLeadForm(ctx, marketers, reload) {
               <option>Website</option><option>WhatsApp</option><option>Manual</option>
             </select></div>
         </div>
+        <div class="field"><label>Alamat</label>
+          <input name="address" placeholder="Kota / alamat lengkap nasabah" /></div>
         <div class="field"><label>Estimasi Potensi (USD)</label>
           <input name="potential" type="number" min="0" step="100" placeholder="5000" /></div>
         <div class="field"><label>Catatan</label><textarea name="note" placeholder="Kebutuhan nasabah, hasil obrolan awal…"></textarea></div>
@@ -195,6 +226,59 @@ function openLeadForm(ctx, marketers, reload) {
           close();
           reload();
         } catch (e) { toast(e.message, 'error'); }
+      });
+    },
+  });
+}
+
+function openImport(reload) {
+  openModal({
+    title: 'Import Leads dari Excel / CSV',
+    body: `
+      <div style="font-size:12.5px;color:var(--text-2);line-height:1.7;margin-bottom:16px">
+        Unggah file <b>.xlsx</b>, <b>.xls</b>, atau <b>.csv</b>. Kolom yang dikenali:
+        <b>Nama</b>, <b>No HP</b>, <b>Alamat</b>, <b>Sumber</b>, <b>Potensi</b>, <b>Catatan</b>.
+      </div>
+      <div class="field">
+        <label>File Leads</label>
+        <input type="file" id="import-file" accept=".xlsx,.xls,.csv" />
+      </div>
+      <label style="display:flex;align-items:center;gap:9px;font-size:13px;color:var(--text-2);cursor:pointer">
+        <input type="checkbox" id="import-distribute" checked style="width:16px;height:16px;accent-color:var(--brand)" />
+        Bagi rata otomatis ke semua marketing aktif
+      </label>
+      <div id="import-status" style="margin-top:14px;font-size:12.5px;color:var(--text-3)"></div>`,
+    footer: `<button class="btn btn-ghost" data-close>Batal</button>
+             <button class="btn btn-primary" id="run-import">${icons.upload} Import Sekarang</button>`,
+    onMount: (modal, close) => {
+      modal.querySelector('#run-import').addEventListener('click', async () => {
+        const input = modal.querySelector('#import-file');
+        const status = modal.querySelector('#import-status');
+        const file = input.files?.[0];
+        if (!file) { toast('Pilih file terlebih dahulu', 'error'); return; }
+        if (file.size > 3 * 1024 * 1024) { toast('Ukuran file maksimal 3 MB', 'error'); return; }
+
+        status.textContent = 'Membaca file…';
+        const base64 = await new Promise((resolve, reject) => {
+          const fr = new FileReader();
+          fr.onload = () => resolve(String(fr.result).split(',').pop());
+          fr.onerror = reject;
+          fr.readAsDataURL(file);
+        });
+
+        try {
+          const r = await api.post('/leads/import', {
+            file: base64,
+            filename: file.name,
+            distribute: modal.querySelector('#import-distribute').checked,
+          });
+          toast(`${r.imported} leads berhasil diimport`, 'success');
+          close();
+          reload();
+        } catch (e) {
+          status.textContent = '';
+          toast(e.message, 'error');
+        }
       });
     },
   });

@@ -17,7 +17,9 @@ export async function renderNmi(root, ctx) {
     <div class="card dark" style="margin-bottom:18px">
       <div class="card-head">
         <div><h3>Riwayat NMI</h3><div class="hint">Margin In − Margin Out = Net Margin In</div></div>
-        <button class="btn btn-primary btn-sm" id="add-nmi">${icons.plus} Catat NMI</button>
+        ${isAdmin
+          ? `<button class="btn btn-primary btn-sm" id="add-nmi">${icons.plus} Catat NMI</button>`
+          : `<span class="badge gray" style="padding:8px 12px">${icons.shield} Dicatat oleh admin</span>`}
       </div>
       <div class="grid grid-3" id="nmi-summary"></div>
     </div>
@@ -110,7 +112,7 @@ export async function renderNmi(root, ctx) {
     });
   });
 
-  page.querySelector('#add-nmi').addEventListener('click', () => openNmiForm(ctx, load));
+  page.querySelector('#add-nmi')?.addEventListener('click', () => openNmiForm(ctx, load));
 
   await load();
 }
@@ -124,17 +126,21 @@ function sumCell(k, v, color) {
 
 export async function openNmiForm(ctx, onDone) {
   const isAdmin = ctx.user.role === 'admin';
-  const marketers = isAdmin ? await api.get('/auth/marketers') : [];
+  if (!isAdmin) {
+    toast('Pencatatan NMI hanya bisa dilakukan admin', 'error');
+    return;
+  }
+  const marketers = await api.get('/auth/marketers');
   const today = new Date().toISOString().slice(0, 10);
 
   openModal({
     title: 'Catat Transaksi NMI',
     body: `
       <form id="nmi-form">
-        ${isAdmin ? `<div class="field"><label>Marketing</label>
+        <div class="field"><label>Marketing</label>
           <select name="marketingId" required>
             ${marketers.map((m) => `<option value="${m.id}">${esc(m.name)}</option>`).join('')}
-          </select></div>` : ''}
+          </select></div>
         <div class="field"><label>Nama Nasabah</label>
           <input name="clientName" placeholder="Contoh: Hendra Kusuma" required /></div>
         <div class="field-row">

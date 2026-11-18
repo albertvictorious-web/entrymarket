@@ -51,7 +51,7 @@ r.get('/overview', authRequired, async (req, res) => {
   const baseMatch = { date: { $gte: since } };
   if (!isAdmin) baseMatch.marketingId = req.user._id;
 
-  const [agg, users, leadsCount, apptCount, announcements] = await Promise.all([
+  const [agg, users, leadsCount, apptCount, announcements, leadsAgg, apptAgg] = await Promise.all([
     nmiAggregate(db, baseMatch),
     db.collection('users').find({ role: 'marketing' }).toArray(),
     db.collection('leads').countDocuments(isAdmin ? {} : { marketingId: req.user._id }),
@@ -59,6 +59,22 @@ r.get('/overview', authRequired, async (req, res) => {
       isAdmin ? { date: { $gte: new Date() } } : { marketingId: req.user._id, date: { $gte: new Date() } },
     ),
     db.collection('announcements').find().sort({ pinned: -1, createdAt: -1 }).limit(3).toArray(),
+    db.collection('leads').aggregate([
+      { $match: isAdmin ? {} : { marketingId: req.user._id } },
+      {
+        $group: {
+          _id: '$marketingId',
+          total: { $sum: 1 },
+          closing: { $sum: { $cond: [{ $eq: ['$status', 'closing'] }, 1, 0] } },
+          lost: { $sum: { $cond: [{ $eq: ['$status', 'lost'] }, 1, 0] } },
+          potential: { $sum: '$potential' },
+        },
+      },
+    ]).toArray(),
+    db.collection('appointments').aggregate([
+      { $match: isAdmin ? {} : { marketingId: req.user._id } },
+      { $group: { _id: '$marketingId', total: { $sum: 1 }, done: { $sum: { $cond: [{ $eq: ['$status', 'done'] }, 1, 0] } } } },
+    ]).toArray(),
   ]);
 
   const byId = new Map(users.map((u) => [String(u._id), u]));
@@ -66,14 +82,50 @@ r.get('/overview', authRequired, async (req, res) => {
     marginIn: 0, marginOut: 0, nmi: 0, lots: 0, clients: 0, txCount: 0,
   };
 
+  const leadsById = new Map(leadsAgg.map((x) => [String(x._id), x]));
+  const apptById = new Map(apptAgg.map((x) => [String(x._id), x]));
+
   const leaderboard = agg
     .map((a) => ({
       ...a,
       name: byId.get(a.marketingId)?.name || 'Marketing',
       avatar: byId.get(a.marketingId)?.avatar || '',
+      leads: leadsById.get(a.marketingId)?.total || 0,
+      closing: leadsById.get(a.marketingId)?.closing || 0,
+      appointments: apptById.get(a.marketingId)?.total || 0,
     }))
     .sort((a, b) => b.nmi - a.nmi)
     .map((a, i) => ({ ...a, rank: i + 1 }));
+
+  /* Performa seluruh marketing — dipakai dashboard admin */
+  const performance = users.map((u) => {
+    const id = String(u._id);
+    const a = agg.find((x) => x.marketingId === id) || {
+      marginIn: 0, marginOut: 0, nmi: 0, lots: 0, clients: 0, txCount: 0,
+    };
+    const l = leadsById.get(id) || { total: 0, closing: 0, lost: 0, potential: 0 };
+    const ap = apptById.get(id) || { total: 0, done: 0 };
+    return {
+      marketingId: id,
+      name: u.name,
+      email: u.email,
+      active: u.active !== false,
+      joinedAt: u.joinedAt,
+      nmi: a.nmi,
+      marginIn: a.marginIn,
+      marginOut: a.marginOut,
+      lots: a.lots,
+      clients: a.clients,
+      txCount: a.txCount,
+      leads: l.total,
+      closing: l.closing,
+      lost: l.lost,
+      potential: l.potential,
+      appointments: ap.total,
+      apptDone: ap.done,
+      rank: leaderboard.find((x) => x.marketingId === id)?.rank || null,
+    };
+  }).sort((a, b) => b.nmi - a.nmi);
 
   const totals = agg.reduce(
     (acc, a) => ({
@@ -108,6 +160,7 @@ r.get('/overview', authRequired, async (req, res) => {
     leadsCount,
     apptCount,
     leaderboard,
+    performance,
     trend: trend.map((t) => ({ date: t._id, nmi: t.marginIn - t.marginOut, marginIn: t.marginIn, marginOut: t.marginOut })),
     announcements: announcements.map((a) => ({ ...a, id: String(a._id) })),
   });
@@ -138,15 +191,15 @@ r.get('/nmi', authRequired, async (req, res) => {
   })));
 });
 
-r.post('/nmi', authRequired, async (req, res) => {
+r.post('/nmi', authRequired, adminOnly, async (req, res) => {
   const db = getDb();
   const { clientName, type, amount, lots, date, note, marketingId } = req.body || {};
   if (!clientName || !['in', 'out'].includes(type) || !(Number(amount) > 0)) {
     return res.status(400).json({ error: 'Data NMI tidak lengkap' });
   }
-  const targetId = req.user.role === 'admin' && marketingId ? oid(marketingId) : req.user._id;
+  if (!marketingId) return res.status(400).json({ error: 'Pilih marketing pemilik transaksi' });
   const doc = {
-    marketingId: targetId,
+    marketingId: oid(marketingId),
     clientName: String(clientName).slice(0, 120),
     type,
     amount: Number(amount),

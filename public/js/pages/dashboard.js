@@ -41,16 +41,159 @@ export async function renderDashboard(root, ctx) {
     }));
     const topLeads = leads.filter((l) => l.status !== 'lost').slice(0, 5);
     const maxNmi = Math.max(...d.leaderboard.map((l) => l.nmi), 1);
+    const perf = d.performance || [];
+    const rangeLabel = RANGES.find((r) => r.id === state.range).label;
 
-    page.innerHTML = `
+    page.innerHTML = isAdmin
+      ? adminView(d, perf, quotes, topLeads, rangeLabel)
+      : marketingView(d, quotes, topLeads, maxNmi, rangeLabel);
+
+    page.querySelectorAll('[data-range]').forEach((b) => {
+      b.addEventListener('click', () => { state.range = b.dataset.range; load(); });
+    });
+    page.querySelectorAll('[data-go]').forEach((b) => {
+      b.addEventListener('click', () => ctx.navigate(b.dataset.go));
+    });
+  }
+
+  /* ================= ADMIN — performa seluruh sales ================= */
+  function adminView(d, perf, quotes, topLeads, rangeLabel) {
+    const active = perf.filter((p) => p.active).length;
+    const totalLeads = perf.reduce((a, p) => a + p.leads, 0);
+    const totalClosing = perf.reduce((a, p) => a + p.closing, 0);
+    const totalAppt = perf.reduce((a, p) => a + p.appointments, 0);
+    const totalNmi = perf.reduce((a, p) => a + p.nmi, 0);
+    const totalLots = perf.reduce((a, p) => a + p.lots, 0);
+    const totalClients = perf.reduce((a, p) => a + p.clients, 0);
+    const best = perf[0];
+    const maxNmi = Math.max(...perf.map((p) => p.nmi), 1);
+
+    return `
       <section class="hero">
         <div class="hero-top">
           <div>
-            <div class="hero-eyebrow"><span class="pulse"></span> Live Dashboard · ${RANGES.find((r) => r.id === state.range).label}</div>
+            <div class="hero-eyebrow"><span class="pulse"></span> Panel Admin · ${rangeLabel}</div>
             <h1>Halo, ${esc(d.me.name.split(' ')[0])} 👋</h1>
-            <p class="hero-sub">${isAdmin
-              ? `Ringkasan performa ${d.totalMarketers} marketing Entry Market`
-              : `Peringkat Anda saat ini <b style="color:#fff">#${d.myRank || '-'}</b> dari ${d.totalMarketers} marketing`}</p>
+            <p class="hero-sub">Pantau performa ${perf.length} marketing Entry Market</p>
+          </div>
+          <div class="seg" style="background:rgba(255,255,255,.08)">
+            ${RANGES.map((r) => `<button data-range="${r.id}" class="${state.range === r.id ? 'active' : ''}" style="${state.range === r.id ? '' : 'color:rgba(255,255,255,.6)'}">${r.label}</button>`).join('')}
+          </div>
+        </div>
+
+        <div class="hero-nmi">
+          <div>
+            <div class="label">Total NMI Tim</div>
+            <div class="value"><span class="cur">$</span>${Number(totalNmi).toLocaleString('en-US')}</div>
+          </div>
+          <span class="chip up">${icons.users} ${active} marketing aktif</span>
+        </div>
+
+        <div class="hero-grid">
+          <div class="hero-cell"><div class="k">Total Leads</div><div class="v">${fmtNum(totalLeads)}<small>leads</small></div></div>
+          <div class="hero-cell"><div class="k">Siap Closing</div><div class="v">${fmtNum(totalClosing)}<small>leads</small></div></div>
+          <div class="hero-cell"><div class="k">Appointment</div><div class="v">${fmtNum(totalAppt)}<small>jadwal</small></div></div>
+          <div class="hero-cell"><div class="k">Total Nasabah</div><div class="v">${fmtNum(totalClients)}<small>nasabah</small></div></div>
+        </div>
+
+        <div class="hero-actions">
+          <button class="btn btn-primary" data-go="nmi">${icons.plus} Catat NMI</button>
+          <button class="btn btn-glass" data-go="leads">${icons.plus} Tambah Leads</button>
+          <button class="btn btn-glass" data-go="admin">${icons.users} Kelola Marketing</button>
+        </div>
+      </section>
+
+      <div class="grid grid-4" style="margin-bottom:18px">
+        ${statCard('Marketing Aktif', `${active}/${perf.length}`, 'akun terdaftar', 'users', 'var(--brand)', 'var(--brand-soft)')}
+        ${statCard('Total Lot Tim', fmtNum(totalLots), 'akumulasi valid lot', 'target', 'var(--blue)', 'var(--blue-soft)')}
+        ${statCard('Leads Siap Closing', String(totalClosing), `dari ${totalLeads} leads`, 'leads', 'var(--amber)', 'var(--amber-soft)')}
+        ${statCard('Top Performer', best ? best.name.split(' ')[0] : '—', best ? fmtCompact(best.nmi) : 'belum ada data', 'trophy', 'var(--green)', 'var(--green-soft)')}
+      </div>
+
+      <div class="card" style="margin-bottom:18px">
+        <div class="card-head">
+          <div>
+            <h3>Performa Marketing</h3>
+            <div class="hint">Peringkat berdasarkan NMI · ${rangeLabel}</div>
+          </div>
+          <button class="btn btn-sm btn-ghost" data-go="admin">Kelola</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>#</th><th>Marketing</th><th class="num">NMI</th><th class="num">Lot</th>
+              <th class="num">Nasabah</th><th class="num">Leads</th><th class="num">Closing</th><th class="num">Appt</th><th>Status</th>
+            </tr></thead>
+            <tbody>
+              ${perf.map((p, i) => `
+                <tr>
+                  <td><span class="lb-rank ${i < 3 ? 'g' + (i + 1) : ''}" style="width:24px;height:24px;font-size:11px">${i + 1}</span></td>
+                  <td><div class="cell-user"><div class="avatar sm">${initials(p.name)}</div>
+                    <div><strong>${esc(p.name)}</strong><span>${esc(p.email)}</span></div></div></td>
+                  <td class="num" style="font-weight:800;color:var(--brand-400)">${fmtUSD(p.nmi)}</td>
+                  <td class="num">${fmtNum(p.lots)}</td>
+                  <td class="num">${p.clients}</td>
+                  <td class="num">${p.leads}</td>
+                  <td class="num">${p.closing}</td>
+                  <td class="num">${p.appointments}</td>
+                  <td><span class="badge ${p.active ? 'green' : 'gray'}">${p.active ? 'Aktif' : 'Nonaktif'}</span></td>
+                </tr>`).join('') || '<tr><td colspan="9"><div class="empty">Belum ada marketing</div></td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="grid grid-main" style="margin-bottom:18px">
+        <div class="card dark">
+          <div class="card-head">
+            <div>
+              <h3>Pergerakan NMI Tim</h3>
+              <div class="hint">Net margin in harian · ${rangeLabel}</div>
+            </div>
+            <span class="chip up" style="font-size:11px">${icons.chart} ${fmtCompact(totalNmi)}</span>
+          </div>
+          ${areaChart(trendOf(d), { height: 168, color: '#c94fba', id: 'nmi-admin' })}
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h3>Kontribusi NMI</h3>
+            <button class="btn btn-sm btn-ghost" data-go="leaderboard">Semua</button>
+          </div>
+          <div>
+            ${perf.slice(0, 6).map((p, i) => `
+              <div class="lb-row">
+                <div class="lb-rank ${i < 3 ? 'g' + (i + 1) : ''}">${i + 1}</div>
+                <div class="avatar sm">${initials(p.name)}</div>
+                <div class="lb-main">
+                  <div class="top">
+                    <strong>${esc(p.name)}</strong>
+                    <span class="amt">${fmtCompact(p.nmi)}</span>
+                  </div>
+                  <div class="lb-bar"><i style="width:${Math.max(3, (p.nmi / maxNmi) * 100)}%"></i></div>
+                </div>
+              </div>`).join('') || '<div class="empty">Belum ada data</div>'}
+          </div>
+        </div>
+      </div>
+
+      ${marketCard(quotes)}
+      ${bottomCards(d, topLeads)}
+    `;
+  }
+
+  /* ================= MARKETING ================= */
+  function marketingView(d, quotes, topLeads, maxNmi, rangeLabel) {
+    return `
+      <section class="hero">
+        <div class="hero-top">
+          <div>
+            <div class="hero-eyebrow"><span class="pulse"></span> Live Dashboard · ${rangeLabel}</div>
+            <h1>Halo, ${esc(d.me.name.split(' ')[0])} 👋</h1>
+            <p class="hero-sub" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <img src="${ctx.settings?.logo('white') || '/img/partner-doo-white.png'}" alt="${esc(ctx.settings?.brokerName || 'Broker partner')}" style="width:auto;height:20px;max-width:90px;object-fit:contain" />
+              <span>${esc(ctx.settings?.brokerName || 'Doo Financial Futures')} · Peringkat #${d.myRank || '-'} dari ${d.totalMarketers} marketing</span>
+            </p>
           </div>
           <div class="seg" style="background:rgba(255,255,255,.08)">
             ${RANGES.map((r) => `<button data-range="${r.id}" class="${state.range === r.id ? 'active' : ''}" style="${state.range === r.id ? '' : 'color:rgba(255,255,255,.6)'}">${r.label}</button>`).join('')}
@@ -76,9 +219,7 @@ export async function renderDashboard(root, ctx) {
         </div>
 
         <div class="hero-actions">
-          ${isAdmin
-            ? `<button class="btn btn-primary" data-go="nmi">${icons.plus} Catat NMI</button>`
-            : `<button class="btn btn-primary" data-go="notes">${icons.edit} Buka Catatan</button>`}
+          <button class="btn btn-primary" data-go="notes">${icons.edit} Buka Catatan</button>
           <button class="btn btn-glass" data-go="appointments">${icons.calendar} Buat Appointment</button>
           <button class="btn btn-glass" data-go="leads">${icons.leads} Lihat Leads</button>
         </div>
@@ -96,11 +237,11 @@ export async function renderDashboard(root, ctx) {
           <div class="card-head">
             <div>
               <h3>Pergerakan NMI</h3>
-              <div class="hint">Net margin in harian · ${RANGES.find((r) => r.id === state.range).label}</div>
+              <div class="hint">Net margin in harian · ${rangeLabel}</div>
             </div>
             <span class="chip up" style="font-size:11px">${icons.chart} ${fmtCompact(d.totals.nmi)}</span>
           </div>
-          ${areaChart(trend, { height: 168, color: '#b93fa6', id: 'nmi' })}
+          ${areaChart(trendOf(d), { height: 168, color: '#c94fba', id: 'nmi' })}
         </div>
 
         <div class="card">
@@ -125,71 +266,78 @@ export async function renderDashboard(root, ctx) {
         </div>
       </div>
 
-      <div class="card dark" style="margin-bottom:18px">
-        <div class="card-head">
-          <div>
-            <h3>Harga Pasar</h3>
-            <div class="hint">Realtime via Twelve Data</div>
-          </div>
-          <span class="chip" style="font-size:11px"><span class="live-dot"></span> Live</span>
-        </div>
-        <div class="ticker">
-          ${quotes.map((q) => `
-            <div class="tick">
-              <div class="sym">${esc(q.short)} <span class="live-dot" style="opacity:${q.isOpen ? 1 : 0.25}"></span></div>
-              <div class="px">${q.price ? q.price.toLocaleString('en-US', { minimumFractionDigits: q.price < 10 ? 4 : 2, maximumFractionDigits: q.price < 10 ? 4 : 2 }) : '—'}</div>
-              <div class="ch ${q.percent >= 0 ? 'up' : 'down'}">${q.percent >= 0 ? '+' : ''}${q.percent.toFixed(2)}%</div>
-            </div>`).join('') || '<div class="empty" style="color:rgba(255,255,255,.4)">Memuat harga…</div>'}
-        </div>
-      </div>
-
-      <div class="grid grid-main">
-        <div class="card">
-          <div class="card-head">
-            <h3>Leads Terbaru</h3>
-            <button class="btn btn-sm btn-ghost" data-go="leads">Kelola</button>
-          </div>
-          <div class="table-wrap">
-            <table>
-              <thead><tr><th>Nasabah</th><th>Sumber</th><th>Status</th><th class="num">Potensi</th></tr></thead>
-              <tbody>
-                ${topLeads.map((l) => `
-                  <tr>
-                    <td><div class="cell-user"><div class="avatar sm">${initials(l.clientName)}</div>
-                      <div><strong>${esc(l.clientName)}</strong><span>${esc(l.marketingName)}</span></div></div></td>
-                    <td>${esc(l.source)}</td>
-                    <td><span class="badge ${LEAD_STATUS[l.status].cls}">${LEAD_STATUS[l.status].label}</span></td>
-                    <td class="num">${fmtUSD(l.potential)}</td>
-                  </tr>`).join('') || '<tr><td colspan="4"><div class="empty">Belum ada leads</div></td></tr>'}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-head">
-            <h3>Pengumuman</h3>
-            <button class="btn btn-sm btn-ghost" data-go="announcements">Semua</button>
-          </div>
-          ${d.announcements.map((a) => `
-            <div style="padding:12px 0;border-bottom:1px solid var(--line)">
-              <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
-                <span class="badge ${a.category === 'reward' ? 'brand' : a.category === 'event' ? 'blue' : 'gray'}">${a.category}</span>
-                <span style="font-size:11px;color:var(--text-3)">${timeAgo(a.createdAt)}</span>
-              </div>
-              <strong style="font-size:13px;display:block;margin-bottom:3px">${esc(a.title)}</strong>
-              <p style="margin:0;font-size:12px;color:var(--text-2);line-height:1.55;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(a.body)}</p>
-            </div>`).join('') || '<div class="empty">Belum ada pengumuman</div>'}
-        </div>
-      </div>
+      ${marketCard(quotes)}
+      ${bottomCards(d, topLeads)}
     `;
+  }
 
-    page.querySelectorAll('[data-range]').forEach((b) => {
-      b.addEventListener('click', () => { state.range = b.dataset.range; load(); });
-    });
-    page.querySelectorAll('[data-go]').forEach((b) => {
-      b.addEventListener('click', () => ctx.navigate(b.dataset.go));
-    });
+  function trendOf(d) {
+    return d.trend.map((t) => ({
+      value: t.nmi,
+      label: new Date(t.date).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' }),
+    }));
+  }
+
+  function marketCard(quotes) {
+    return `<div class="card dark" style="margin-bottom:18px">
+      <div class="card-head">
+        <div>
+          <h3>Harga Pasar</h3>
+          <div class="hint">Realtime via Twelve Data</div>
+        </div>
+        <span class="chip" style="font-size:11px"><span class="live-dot"></span> Live</span>
+      </div>
+      <div class="ticker">
+        ${quotes.map((q) => `
+          <div class="tick">
+            <div class="sym">${esc(q.short)} <span class="live-dot" style="opacity:${q.isOpen ? 1 : 0.25}"></span></div>
+            <div class="px">${q.price ? q.price.toLocaleString('en-US', { minimumFractionDigits: q.price < 10 ? 4 : 2, maximumFractionDigits: q.price < 10 ? 4 : 2 }) : '—'}</div>
+            <div class="ch ${q.percent >= 0 ? 'up' : 'down'}">${q.percent >= 0 ? '+' : ''}${q.percent.toFixed(2)}%</div>
+          </div>`).join('') || '<div class="empty" style="color:rgba(255,255,255,.4)">Memuat harga…</div>'}
+      </div>
+    </div>`;
+  }
+
+  function bottomCards(d, topLeads) {
+    return `<div class="grid grid-main">
+      <div class="card">
+        <div class="card-head">
+          <h3>Leads Terbaru</h3>
+          <button class="btn btn-sm btn-ghost" data-go="leads">Kelola</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Nasabah</th><th>Sumber</th><th>Status</th><th class="num">Potensi</th></tr></thead>
+            <tbody>
+              ${topLeads.map((l) => `
+                <tr>
+                  <td><div class="cell-user"><div class="avatar sm">${initials(l.clientName)}</div>
+                    <div><strong>${esc(l.clientName)}</strong><span>${esc(l.marketingName)}</span></div></div></td>
+                  <td>${esc(l.source)}</td>
+                  <td><span class="badge ${LEAD_STATUS[l.status].cls}">${LEAD_STATUS[l.status].label}</span></td>
+                  <td class="num">${fmtUSD(l.potential)}</td>
+                </tr>`).join('') || '<tr><td colspan="4"><div class="empty">Belum ada leads</div></td></tr>'}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h3>Pengumuman</h3>
+          <button class="btn btn-sm btn-ghost" data-go="announcements">Semua</button>
+        </div>
+        ${d.announcements.map((a) => `
+          <div style="padding:12px 0;border-bottom:1px solid var(--line)">
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
+              <span class="badge ${a.category === 'reward' ? 'brand' : a.category === 'event' ? 'blue' : 'gray'}">${a.category}</span>
+              <span style="font-size:11px;color:var(--text-3)">${timeAgo(a.createdAt)}</span>
+            </div>
+            <strong style="font-size:13px;display:block;margin-bottom:3px">${esc(a.title)}</strong>
+            <p style="margin:0;font-size:12px;color:var(--text-2);line-height:1.55;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">${esc(a.body)}</p>
+          </div>`).join('') || '<div class="empty">Belum ada pengumuman</div>'}
+      </div>
+    </div>`;
   }
 
   await load();
