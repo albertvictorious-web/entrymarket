@@ -48,19 +48,19 @@ r.get('/overview', authRequired, async (req, res) => {
   const since = rangeStart(range);
   const isAdmin = req.user.role === 'admin';
 
-  const baseMatch = { date: { $gte: since } };
+  const baseMatch = { tenantId: req.tenantId, date: { $gte: since } };
   if (!isAdmin) baseMatch.marketingId = req.user._id;
 
   const [agg, users, leadsCount, apptCount, announcements, leadsAgg, apptAgg] = await Promise.all([
     nmiAggregate(db, baseMatch),
-    db.collection('users').find({ role: 'marketing' }).toArray(),
-    db.collection('leads').countDocuments(isAdmin ? {} : { marketingId: req.user._id }),
+    db.collection('users').find({ tenantId: req.tenantId, role: 'marketing' }).toArray(),
+    db.collection('leads').countDocuments({ tenantId: req.tenantId, ...(isAdmin ? {} : { marketingId: req.user._id }) }),
     db.collection('appointments').countDocuments(
-      isAdmin ? { date: { $gte: new Date() } } : { marketingId: req.user._id, date: { $gte: new Date() } },
+      { tenantId: req.tenantId, date: { $gte: new Date() }, ...(isAdmin ? {} : { marketingId: req.user._id }) },
     ),
-    db.collection('announcements').find().sort({ pinned: -1, createdAt: -1 }).limit(3).toArray(),
+    db.collection('announcements').find({ tenantId: req.tenantId }).sort({ pinned: -1, createdAt: -1 }).limit(3).toArray(),
     db.collection('leads').aggregate([
-      { $match: isAdmin ? {} : { marketingId: req.user._id } },
+      { $match: { tenantId: req.tenantId, ...(isAdmin ? {} : { marketingId: req.user._id }) } },
       {
         $group: {
           _id: '$marketingId',
@@ -72,7 +72,7 @@ r.get('/overview', authRequired, async (req, res) => {
       },
     ]).toArray(),
     db.collection('appointments').aggregate([
-      { $match: isAdmin ? {} : { marketingId: req.user._id } },
+      { $match: { tenantId: req.tenantId, ...(isAdmin ? {} : { marketingId: req.user._id }) } },
       { $group: { _id: '$marketingId', total: { $sum: 1 }, done: { $sum: { $cond: [{ $eq: ['$status', 'done'] }, 1, 0] } } } },
     ]).toArray(),
   ]);
@@ -169,13 +169,13 @@ r.get('/overview', authRequired, async (req, res) => {
 r.get('/nmi', authRequired, async (req, res) => {
   const db = getDb();
   const { range = '30d', marketingId, type } = req.query;
-  const match = { date: { $gte: rangeStart(range) } };
+  const match = { tenantId: req.tenantId, date: { $gte: rangeStart(range) } };
   if (req.user.role !== 'admin') match.marketingId = req.user._id;
   else if (marketingId) match.marketingId = oid(marketingId);
   if (type === 'in' || type === 'out') match.type = type;
 
   const rows = await db.collection('nmi').find(match).sort({ date: -1 }).limit(300).toArray();
-  const users = await db.collection('users').find({ role: 'marketing' }).toArray();
+  const users = await db.collection('users').find({ tenantId: req.tenantId, role: 'marketing' }).toArray();
   const byId = new Map(users.map((u) => [String(u._id), u.name]));
 
   res.json(rows.map((x) => ({
@@ -198,8 +198,13 @@ r.post('/nmi', authRequired, adminOnly, async (req, res) => {
     return res.status(400).json({ error: 'Data NMI tidak lengkap' });
   }
   if (!marketingId) return res.status(400).json({ error: 'Pilih marketing pemilik transaksi' });
+  const ownerId = oid(marketingId);
+  if (!await db.collection('users').findOne({ _id: ownerId, tenantId: req.tenantId, role: 'marketing' })) {
+    return res.status(400).json({ error: 'Marketing pemilik transaksi tidak valid' });
+  }
   const doc = {
-    marketingId: oid(marketingId),
+    tenantId: req.tenantId,
+    marketingId: ownerId,
     clientName: String(clientName).slice(0, 120),
     type,
     amount: Number(amount),
@@ -214,15 +219,15 @@ r.post('/nmi', authRequired, adminOnly, async (req, res) => {
 
 r.delete('/nmi/:id', authRequired, adminOnly, async (req, res) => {
   const db = getDb();
-  await db.collection('nmi').deleteOne({ _id: oid(req.params.id) });
+  await db.collection('nmi').deleteOne({ _id: oid(req.params.id), tenantId: req.tenantId });
   res.json({ ok: true });
 });
 
 r.get('/leaderboard', authRequired, async (req, res) => {
   const db = getDb();
   const range = req.query.range || '30d';
-  const agg = await nmiAggregate(db, { date: { $gte: rangeStart(range) } });
-  const users = await db.collection('users').find({ role: 'marketing' }).toArray();
+  const agg = await nmiAggregate(db, { tenantId: req.tenantId, date: { $gte: rangeStart(range) } });
+  const users = await db.collection('users').find({ tenantId: req.tenantId, role: 'marketing' }).toArray();
   const byId = new Map(users.map((u) => [String(u._id), u]));
   const list = users.map((u) => {
     const a = agg.find((x) => x.marketingId === String(u._id)) || {

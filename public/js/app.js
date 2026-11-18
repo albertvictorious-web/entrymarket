@@ -13,6 +13,7 @@ import { renderTools } from './pages/tools.js';
 import { renderAdmin } from './pages/admin.js';
 import { renderProfile } from './pages/profile.js';
 import { renderNotes } from './pages/notes.js';
+import { renderMaster } from './pages/master.js';
 import { mountAiAssistant } from './ai.js';
 
 /** Pengaturan broker partner — diisi admin, dipakai di sidebar & profil. */
@@ -47,6 +48,7 @@ const ROUTES = {
   notes: { title: 'Catatan', sub: 'Catatan pribadi & pengingat', icon: 'edit', render: renderNotes, group: 'Aktivitas' },
   tools: { title: 'Tools Trading', sub: 'Harga, kalender, sesi & berita', icon: 'tools', render: renderTools, group: 'Trading' },
   admin: { title: 'Manajemen Marketing', sub: 'Kelola akun & akses', icon: 'users', render: renderAdmin, group: 'Admin', adminOnly: true },
+  tenants: { title: 'Master Admin', sub: 'Broker, tenant & langganan', icon: 'building', render: renderMaster, group: 'Platform', masterOnly: true },
   profile: { title: 'Profil', sub: 'Keanggotaan & akun', icon: 'shield', render: renderProfile, group: 'Akun' },
 };
 
@@ -65,13 +67,17 @@ function navGroups(user) {
   const groups = {};
   Object.entries(ROUTES).forEach(([key, r]) => {
     if (r.adminOnly && user.role !== 'admin') return;
+    if (r.masterOnly && user.role !== 'master') return;
+    if (user.role === 'master' && !r.masterOnly) return;
     (groups[r.group] ||= []).push([key, r]);
   });
   return groups;
 }
 
 function shell(user) {
+  const isMaster = user.role === 'master';
   const groups = navGroups(user);
+  const mobileNav = isMaster ? ['tenants'] : MOBILE_NAV;
   return `
     <div class="shell">
       <aside class="sidebar">
@@ -89,14 +95,14 @@ function shell(user) {
               </button>`).join('')}
           `).join('')}
         </nav>
-        ${user.role !== 'admin' ? `<div class="sidebar-partner">
+        ${user.role === 'marketing' ? `<div class="sidebar-partner">
           <img src="${settings.logo('color')}" alt="${esc(settings.brokerName)}" class="${settings.brokerLogo ? 'custom' : 'is-default'}" />
           <span class="sp-label">Official<br />Partner</span>
         </div>` : ''}
         <div class="sidebar-foot">
-          <button class="user-chip" data-route="profile">
+          <button class="user-chip" data-route="${isMaster ? 'tenants' : 'profile'}">
             <div class="avatar">${initials(user.name)}</div>
-            <div class="meta"><strong>${esc(user.name)}</strong><span>${user.role}</span></div>
+            <div class="meta"><strong>${esc(user.name)}</strong><span>${isMaster ? 'Master Admin' : user.role}</span></div>
             <span style="width:16px;height:16px;color:var(--text-3)">${icons.chevronRight}</span>
           </button>
         </div>
@@ -109,10 +115,8 @@ function shell(user) {
             <img src="/img/logo-word-white.png" alt="Entry Market" class="mt-logo-word" />
           </div>
           <span class="mt-spacer"></span>
-          <button class="icon-btn" data-route="announcements" title="Pengumuman">${icons.bell}<span class="dot"></span></button>
-          <button class="icon-btn mt-profile" data-route="profile" title="Profil">
-            <span class="mt-avatar">${initials(user.name)}</span>
-          </button>
+          ${isMaster ? '' : `<button class="icon-btn" data-route="announcements" title="Pengumuman">${icons.bell}<span class="dot"></span></button>
+          <button class="icon-btn mt-profile" data-route="profile" title="Profil"><span class="mt-avatar">${initials(user.name)}</span></button>`}
         </div>
 
         <header class="topbar">
@@ -121,14 +125,14 @@ function shell(user) {
             <div class="sub" id="page-sub">Ringkasan performa NMI</div>
           </div>
           <div class="topbar-spacer"></div>
-          <button class="icon-btn" data-route="announcements" title="Pengumuman">${icons.bell}<span class="dot"></span></button>
-          <button class="icon-btn" data-route="profile" title="Profil">${icons.shield}</button>
+          ${isMaster ? '' : `<button class="icon-btn" data-route="announcements" title="Pengumuman">${icons.bell}<span class="dot"></span></button>
+          <button class="icon-btn" data-route="profile" title="Profil">${icons.shield}</button>`}
         </header>
 
         <main class="content" id="content"></main>
 
         <nav class="bottom-nav">
-          ${MOBILE_NAV.map((k) => `
+          ${mobileNav.map((k) => `
             <button class="bn-item" data-route="${k}">
               <span class="bn-ico">${icons[ROUTES[k].icon]}</span>
               <span>${ROUTES[k].title.split(' ')[0]}</span>
@@ -144,6 +148,8 @@ async function navigate(key) {
   if (!ROUTES[key]) key = 'dashboard';
   const user = store.user;
   if (ROUTES[key].adminOnly && user.role !== 'admin') key = 'dashboard';
+  if (user.role === 'master' && !ROUTES[key].masterOnly) key = 'tenants';
+  if (ROUTES[key].masterOnly && user.role !== 'master') key = 'dashboard';
   currentRoute = key;
   if (location.hash !== `#/${key}`) history.replaceState(null, '', `#/${key}`);
 
@@ -218,7 +224,7 @@ function renderLogin() {
         </div>
         <div class="login-card">
           <h1>Masuk ke Dashboard</h1>
-          <p>Gunakan akun marketing atau admin Anda.</p>
+          <p>Gunakan akun marketing, admin, atau Master Admin Anda.</p>
           <form id="login-form">
             <div class="field">
               <label>Email</label>
@@ -266,13 +272,13 @@ async function boot() {
     renderLogin();
     return;
   }
-  await settings.load();
+  if (store.user.role !== 'master') await settings.load();
   app.innerHTML = shell(store.user);
   document.querySelectorAll('[data-route]').forEach((el) => {
     el.addEventListener('click', () => navigate(el.dataset.route));
   });
-  mountAiAssistant(store.user);
-  await navigate(routeFromHash());
+  if (store.user.role !== 'master') mountAiAssistant(store.user);
+  await navigate(store.user.role === 'master' ? 'tenants' : routeFromHash());
 }
 
 window.addEventListener('hashchange', () => {

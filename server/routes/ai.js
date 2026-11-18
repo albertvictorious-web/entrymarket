@@ -13,7 +13,7 @@ Jika data tidak tersedia, katakan apa adanya dan sarankan langkah berikutnya.`;
 async function buildContext(db, user) {
   const isAdmin = user.role === 'admin';
   const since = new Date(Date.now() - 30 * 86400000);
-  const match = { date: { $gte: since } };
+  const match = { tenantId: user.tenantId, date: { $gte: since } };
   if (!isAdmin) match.marketingId = user._id;
 
   const [agg, leads, appts, rewards] = await Promise.all([
@@ -29,9 +29,9 @@ async function buildContext(db, user) {
         },
       },
     ]).toArray(),
-    db.collection('leads').countDocuments(isAdmin ? {} : { marketingId: user._id }),
-    db.collection('appointments').countDocuments(isAdmin ? {} : { marketingId: user._id }),
-    db.collection('rewards').countDocuments(isAdmin ? {} : { marketingId: user._id }),
+    db.collection('leads').countDocuments({ tenantId: user.tenantId, ...(isAdmin ? {} : { marketingId: user._id }) }),
+    db.collection('appointments').countDocuments({ tenantId: user.tenantId, ...(isAdmin ? {} : { marketingId: user._id }) }),
+    db.collection('rewards').countDocuments({ tenantId: user.tenantId, ...(isAdmin ? {} : { marketingId: user._id }) }),
   ]);
 
   const s = agg[0] || { marginIn: 0, marginOut: 0, lots: 0, clients: [] };
@@ -52,7 +52,7 @@ async function buildContext(db, user) {
   if (isAdmin) {
     const [teamAgg, marketers] = await Promise.all([
       db.collection('nmi').aggregate([
-        { $match: { date: { $gte: since } } },
+        { $match: { tenantId: user.tenantId, date: { $gte: since } } },
         {
           $group: {
             _id: '$marketingId',
@@ -63,7 +63,7 @@ async function buildContext(db, user) {
           },
         },
       ]).toArray(),
-      db.collection('users').find({ role: 'marketing' }).toArray(),
+      db.collection('users').find({ tenantId: user.tenantId, role: 'marketing' }).toArray(),
     ]);
     const nameById = new Map(marketers.map((m) => [String(m._id), m.name]));
     base.leaderboard = teamAgg
@@ -102,7 +102,7 @@ function localAnswer(question, ctx) {
 r.get('/history', authRequired, async (req, res) => {
   const db = getDb();
   const rows = await db.collection('ai_chats')
-    .find({ userId: req.user._id })
+    .find({ tenantId: req.tenantId, userId: req.user._id })
     .sort({ createdAt: -1 })
     .limit(40)
     .toArray();
@@ -116,7 +116,7 @@ r.get('/history', authRequired, async (req, res) => {
 
 r.delete('/history', authRequired, async (req, res) => {
   const db = getDb();
-  await db.collection('ai_chats').deleteMany({ userId: req.user._id });
+  await db.collection('ai_chats').deleteMany({ tenantId: req.tenantId, userId: req.user._id });
   res.json({ ok: true });
 });
 
@@ -128,7 +128,7 @@ r.post('/chat', authRequired, async (req, res) => {
   const ctx = await buildContext(db, req.user);
   const now = new Date();
   await db.collection('ai_chats').insertOne({
-    userId: req.user._id, role: 'user', content: message, createdAt: now,
+    tenantId: req.tenantId, userId: req.user._id, role: 'user', content: message, createdAt: now,
   });
 
   let answer = '';
@@ -136,7 +136,7 @@ r.post('/chat', authRequired, async (req, res) => {
   let lastErr = '';
 
   const history = await db.collection('ai_chats')
-    .find({ userId: req.user._id })
+    .find({ tenantId: req.tenantId, userId: req.user._id })
     .sort({ createdAt: -1 })
     .limit(4)
     .toArray();
@@ -219,7 +219,7 @@ r.post('/chat', authRequired, async (req, res) => {
   if (!answer) answer = localAnswer(message, ctx);
 
   await db.collection('ai_chats').insertOne({
-    userId: req.user._id, role: 'assistant', content: answer, createdAt: new Date(),
+    tenantId: req.tenantId, userId: req.user._id, role: 'assistant', content: answer, createdAt: new Date(),
   });
 
   res.json({ answer, provider, ...(lastErr && !answer ? { debug: lastErr } : {}) });

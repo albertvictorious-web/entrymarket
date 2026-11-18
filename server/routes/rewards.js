@@ -53,9 +53,10 @@ r.get('/programs', authRequired, (req, res) => res.json({ cashTiers: CASH_TIERS,
 
 r.get('/', authRequired, async (req, res) => {
   const db = getDb();
-  const match = req.user.role === 'admin' ? {} : { marketingId: req.user._id };
+  const match = { tenantId: req.tenantId };
+  if (req.user.role !== 'admin') match.marketingId = req.user._id;
   const rows = await db.collection('rewards').find(match).sort({ createdAt: -1 }).toArray();
-  const users = await db.collection('users').find({ role: 'marketing' }).toArray();
+  const users = await db.collection('users').find({ tenantId: req.tenantId, role: 'marketing' }).toArray();
   const byId = new Map(users.map((u) => [String(u._id), u.name]));
   res.json(rows.map((x) => ({
     ...x,
@@ -72,7 +73,7 @@ r.get('/progress', authRequired, async (req, res) => {
     : req.user._id;
   const since = new Date(Date.now() - 30 * 86400000);
   const agg = await db.collection('nmi').aggregate([
-    { $match: { marketingId, date: { $gte: since } } },
+    { $match: { tenantId: req.tenantId, marketingId, date: { $gte: since } } },
     {
       $group: {
         _id: null,
@@ -116,8 +117,13 @@ r.post('/', authRequired, adminOnly, async (req, res) => {
   const db = getDb();
   const { marketingId, type, title, closingAmount, cashValue } = req.body || {};
   if (!marketingId || !title) return res.status(400).json({ error: 'Marketing dan judul wajib' });
+  const ownerId = oid(marketingId);
+  if (!await db.collection('users').findOne({ _id: ownerId, tenantId: req.tenantId, role: 'marketing' })) {
+    return res.status(400).json({ error: 'Marketing tujuan tidak valid' });
+  }
   const doc = {
-    marketingId: oid(marketingId),
+    tenantId: req.tenantId,
+    marketingId: ownerId,
     type: type || 'cash',
     title,
     closingAmount: Number(closingAmount) || 0,
@@ -139,7 +145,7 @@ r.post('/request', authRequired, async (req, res) => {
 
   const since = new Date(Date.now() - 30 * 86400000);
   const agg = await db.collection('nmi').aggregate([
-    { $match: { marketingId: req.user._id, date: { $gte: since } } },
+    { $match: { tenantId: req.tenantId, marketingId: req.user._id, date: { $gte: since } } },
     { $group: { _id: null, marginIn: { $sum: { $cond: [{ $eq: ['$type', 'in'] }, '$amount', 0] } } } },
   ]).toArray();
   const closingNow = Math.round(agg[0]?.marginIn || 0);
@@ -148,11 +154,12 @@ r.post('/request', authRequired, async (req, res) => {
   }
 
   const existing = await db.collection('rewards').findOne({
-    marketingId: req.user._id, type: 'cash', closingAmount: tier.closing,
+    tenantId: req.tenantId, marketingId: req.user._id, type: 'cash', closingAmount: tier.closing,
   });
   if (existing) return res.status(400).json({ error: 'Reward tier ini sudah diajukan' });
 
   const { insertedId } = await db.collection('rewards').insertOne({
+    tenantId: req.tenantId,
     marketingId: req.user._id,
     type: 'cash',
     title: `Reward Cash Closing $${tier.closing.toLocaleString('en-US')}`,
@@ -168,14 +175,14 @@ r.post('/request', authRequired, async (req, res) => {
 
 r.post('/:id/claim', authRequired, async (req, res) => {
   const db = getDb();
-  const reward = await db.collection('rewards').findOne({ _id: oid(req.params.id) });
+  const reward = await db.collection('rewards').findOne({ _id: oid(req.params.id), tenantId: req.tenantId });
   if (!reward) return res.status(404).json({ error: 'Reward tidak ditemukan' });
   if (req.user.role !== 'admin' && String(reward.marketingId) !== String(req.user._id)) {
     return res.status(403).json({ error: 'Bukan reward Anda' });
   }
   if (reward.status === 'claimed') return res.status(400).json({ error: 'Reward sudah di-claim' });
   await db.collection('rewards').updateOne(
-    { _id: oid(req.params.id) },
+    { _id: oid(req.params.id), tenantId: req.tenantId },
     { $set: { status: 'claimed', claimedAt: new Date() } },
   );
   res.json({ ok: true });
@@ -183,7 +190,7 @@ r.post('/:id/claim', authRequired, async (req, res) => {
 
 r.delete('/:id', authRequired, adminOnly, async (req, res) => {
   const db = getDb();
-  await db.collection('rewards').deleteOne({ _id: oid(req.params.id) });
+  await db.collection('rewards').deleteOne({ _id: oid(req.params.id), tenantId: req.tenantId });
   res.json({ ok: true });
 });
 

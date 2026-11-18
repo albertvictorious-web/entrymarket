@@ -8,7 +8,7 @@ const oid = (v) => new ObjectId(String(v));
 
 r.get('/', authRequired, async (req, res) => {
   const db = getDb();
-  const rows = await db.collection('announcements').find().sort({ pinned: -1, createdAt: -1 }).toArray();
+  const rows = await db.collection('announcements').find({ tenantId: req.tenantId }).sort({ pinned: -1, createdAt: -1 }).toArray();
   res.json(rows.map((x) => ({ ...x, id: String(x._id) })));
 });
 
@@ -22,6 +22,7 @@ r.post('/', authRequired, adminOnly, async (req, res) => {
     category: category || 'info',
     pinned: !!pinned,
     authorId: req.user._id,
+    tenantId: req.tenantId,
     createdAt: new Date(),
   };
   const { insertedId } = await db.collection('announcements').insertOne(doc);
@@ -30,7 +31,7 @@ r.post('/', authRequired, adminOnly, async (req, res) => {
 
 r.delete('/:id', authRequired, adminOnly, async (req, res) => {
   const db = getDb();
-  await db.collection('announcements').deleteOne({ _id: oid(req.params.id) });
+  await db.collection('announcements').deleteOne({ _id: oid(req.params.id), tenantId: req.tenantId });
   res.json({ ok: true });
 });
 

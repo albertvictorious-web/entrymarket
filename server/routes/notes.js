@@ -11,7 +11,7 @@ const COLORS = ['default', 'amber', 'green', 'blue', 'rose'];
 r.get('/', authRequired, async (req, res) => {
   const db = getDb();
   const rows = await db.collection('notes')
-    .find({ userId: req.user._id })
+    .find({ tenantId: req.tenantId, userId: req.user._id })
     .sort({ pinned: -1, updatedAt: -1 })
     .limit(200)
     .toArray();
@@ -34,6 +34,7 @@ r.post('/', authRequired, async (req, res) => {
   }
   const now = new Date();
   const doc = {
+    tenantId: req.tenantId,
     userId: req.user._id,
     title: String(title || '').slice(0, 160),
     body: String(body || '').slice(0, 8000),
@@ -48,7 +49,7 @@ r.post('/', authRequired, async (req, res) => {
 
 r.patch('/:id', authRequired, async (req, res) => {
   const db = getDb();
-  const note = await db.collection('notes').findOne({ _id: oid(req.params.id), userId: req.user._id });
+  const note = await db.collection('notes').findOne({ _id: oid(req.params.id), tenantId: req.tenantId, userId: req.user._id });
   if (!note) return res.status(404).json({ error: 'Catatan tidak ditemukan' });
   const { title, body, color, pinned } = req.body || {};
   const set = { updatedAt: new Date() };
@@ -56,13 +57,13 @@ r.patch('/:id', authRequired, async (req, res) => {
   if (body !== undefined) set.body = String(body).slice(0, 8000);
   if (color !== undefined && COLORS.includes(color)) set.color = color;
   if (pinned !== undefined) set.pinned = !!pinned;
-  await db.collection('notes').updateOne({ _id: note._id }, { $set: set });
+  await db.collection('notes').updateOne({ _id: note._id, tenantId: req.tenantId }, { $set: set });
   res.json({ ok: true });
 });
 
 r.delete('/:id', authRequired, async (req, res) => {
   const db = getDb();
-  await db.collection('notes').deleteOne({ _id: oid(req.params.id), userId: req.user._id });
+  await db.collection('notes').deleteOne({ _id: oid(req.params.id), tenantId: req.tenantId, userId: req.user._id });
   res.json({ ok: true });
 });
 

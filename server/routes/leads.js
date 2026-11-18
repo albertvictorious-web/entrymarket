@@ -8,8 +8,8 @@ const r = Router();
 const oid = (v) => new ObjectId(String(v));
 const STATUSES = ['new', 'contacted', 'prospect', 'closing', 'lost'];
 
-async function withNames(db, rows) {
-  const users = await db.collection('users').find({ role: 'marketing' }).toArray();
+async function withNames(db, rows, tenantId) {
+  const users = await db.collection('users').find({ tenantId, role: 'marketing' }).toArray();
   const byId = new Map(users.map((u) => [String(u._id), u.name]));
   return rows.map((x) => ({
     ...x,
@@ -21,11 +21,12 @@ async function withNames(db, rows) {
 
 r.get('/', authRequired, async (req, res) => {
   const db = getDb();
-  const match = req.user.role === 'admin' ? {} : { marketingId: req.user._id };
+  const match = { tenantId: req.tenantId };
+  if (req.user.role !== 'admin') match.marketingId = req.user._id;
   if (req.query.status && STATUSES.includes(req.query.status)) match.status = req.query.status;
   if (req.query.marketingId && req.user.role === 'admin') match.marketingId = oid(req.query.marketingId);
   const rows = await db.collection('leads').find(match).sort({ updatedAt: -1 }).toArray();
-  res.json(await withNames(db, rows));
+  res.json(await withNames(db, rows, req.tenantId));
 });
 
 r.post('/', authRequired, async (req, res) => {
@@ -33,8 +34,13 @@ r.post('/', authRequired, async (req, res) => {
   const { clientName, phone, address, source, potential, note, marketingId } = req.body || {};
   if (!clientName) return res.status(400).json({ error: 'Nama nasabah wajib' });
   const target = req.user.role === 'admin' && marketingId ? oid(marketingId) : req.user._id;
+  if (req.user.role === 'admin' && marketingId
+    && !await db.collection('users').findOne({ _id: target, tenantId: req.tenantId, role: 'marketing' })) {
+    return res.status(400).json({ error: 'Marketing tujuan tidak valid' });
+  }
   const doc = {
     marketingId: target,
+    tenantId: req.tenantId,
     clientName,
     phone: phone || '',
     address: address || '',
@@ -105,12 +111,13 @@ r.post('/import', authRequired, adminOnly, async (req, res) => {
     return res.status(400).json({ error: 'Tidak ada baris valid. Pastikan ada kolom "Nama" / "Nama Nasabah".' });
   }
 
-  const marketers = await db.collection('users').find({ role: 'marketing', active: { $ne: false } }).sort({ name: 1 }).toArray();
+  const marketers = await db.collection('users').find({ tenantId: req.tenantId, role: 'marketing', active: { $ne: false } }).sort({ name: 1 }).toArray();
   if (!marketers.length) return res.status(400).json({ error: 'Belum ada akun marketing untuk menerima leads' });
 
   const now = new Date();
   const docs = parsed.map((row, i) => ({
     marketingId: distribute === false ? marketers[0]._id : marketers[i % marketers.length]._id,
+    tenantId: req.tenantId,
     clientName: String(row.clientName).slice(0, 120),
     phone: String(row.phone || '').slice(0, 40),
     address: String(row.address || '').slice(0, 240),
@@ -134,15 +141,15 @@ r.post('/import', authRequired, adminOnly, async (req, res) => {
 /* ---------- Bagi rata semua leads ke seluruh marketing ---------- */
 r.post('/distribute', authRequired, adminOnly, async (req, res) => {
   const db = getDb();
-  const marketers = await db.collection('users').find({ role: 'marketing', active: { $ne: false } }).sort({ name: 1 }).toArray();
+  const marketers = await db.collection('users').find({ tenantId: req.tenantId, role: 'marketing', active: { $ne: false } }).sort({ name: 1 }).toArray();
   if (!marketers.length) return res.status(400).json({ error: 'Belum ada akun marketing aktif' });
 
-  const leads = await db.collection('leads').find({}).sort({ createdAt: 1 }).toArray();
+  const leads = await db.collection('leads').find({ tenantId: req.tenantId }).sort({ createdAt: 1 }).toArray();
   if (!leads.length) return res.status(400).json({ error: 'Belum ada leads untuk dibagikan' });
 
   const ops = leads.map((l, i) => ({
     updateOne: {
-      filter: { _id: l._id },
+      filter: { _id: l._id, tenantId: req.tenantId },
       update: { $set: { marketingId: marketers[i % marketers.length]._id, updatedAt: new Date() } },
     },
   }));
@@ -152,7 +159,7 @@ r.post('/distribute', authRequired, adminOnly, async (req, res) => {
 
 r.patch('/:id', authRequired, async (req, res) => {
   const db = getDb();
-  const lead = await db.collection('leads').findOne({ _id: oid(req.params.id) });
+  const lead = await db.collection('leads').findOne({ _id: oid(req.params.id), tenantId: req.tenantId });
   if (!lead) return res.status(404).json({ error: 'Lead tidak ditemukan' });
   if (req.user.role !== 'admin' && String(lead.marketingId) !== String(req.user._id)) {
     return res.status(403).json({ error: 'Bukan lead Anda' });
@@ -166,14 +173,20 @@ r.patch('/:id', authRequired, async (req, res) => {
   if (phone !== undefined) set.phone = phone;
   if (address !== undefined) set.address = address;
   if (source) set.source = source;
-  if (marketingId && req.user.role === 'admin') set.marketingId = oid(marketingId);
-  await db.collection('leads').updateOne({ _id: oid(req.params.id) }, { $set: set });
+  if (marketingId && req.user.role === 'admin') {
+    const target = oid(marketingId);
+    if (!await db.collection('users').findOne({ _id: target, tenantId: req.tenantId, role: 'marketing' })) {
+      return res.status(400).json({ error: 'Marketing tujuan tidak valid' });
+    }
+    set.marketingId = target;
+  }
+  await db.collection('leads').updateOne({ _id: oid(req.params.id), tenantId: req.tenantId }, { $set: set });
   res.json({ ok: true });
 });
 
 r.delete('/:id', authRequired, adminOnly, async (req, res) => {
   const db = getDb();
-  await db.collection('leads').deleteOne({ _id: oid(req.params.id) });
+  await db.collection('leads').deleteOne({ _id: oid(req.params.id), tenantId: req.tenantId });
   res.json({ ok: true });
 });
 

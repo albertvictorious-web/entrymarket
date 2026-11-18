@@ -17,7 +17,7 @@ function slugify(s) {
 r.get('/', authRequired, async (req, res) => {
   const db = getDb();
   const rows = await db.collection('reglinks')
-    .find({ userId: req.user._id })
+    .find({ tenantId: req.tenantId, userId: req.user._id })
     .sort({ createdAt: -1 })
     .toArray();
   res.json(rows.map((x) => ({
@@ -38,6 +38,7 @@ r.post('/', authRequired, async (req, res) => {
     return res.status(400).json({ error: 'URL harus diawali http:// atau https://' });
   }
   const doc = {
+    tenantId: req.tenantId,
     userId: req.user._id,
     title: String(title).slice(0, 120),
     url: String(url).slice(0, 500),
@@ -52,7 +53,7 @@ r.post('/', authRequired, async (req, res) => {
 
 r.patch('/:id', authRequired, async (req, res) => {
   const db = getDb();
-  const link = await db.collection('reglinks').findOne({ _id: oid(req.params.id), userId: req.user._id });
+  const link = await db.collection('reglinks').findOne({ _id: oid(req.params.id), tenantId: req.tenantId, userId: req.user._id });
   if (!link) return res.status(404).json({ error: 'Link tidak ditemukan' });
   const { title, url, note } = req.body || {};
   const set = {};
@@ -62,13 +63,13 @@ r.patch('/:id', authRequired, async (req, res) => {
     set.url = String(url).slice(0, 500);
   }
   if (note !== undefined) set.note = String(note).slice(0, 300);
-  await db.collection('reglinks').updateOne({ _id: link._id }, { $set: set });
+  await db.collection('reglinks').updateOne({ _id: link._id, tenantId: req.tenantId }, { $set: set });
   res.json({ ok: true });
 });
 
 r.delete('/:id', authRequired, async (req, res) => {
   const db = getDb();
-  await db.collection('reglinks').deleteOne({ _id: oid(req.params.id), userId: req.user._id });
+  await db.collection('reglinks').deleteOne({ _id: oid(req.params.id), tenantId: req.tenantId, userId: req.user._id });
   res.json({ ok: true });
 });
 

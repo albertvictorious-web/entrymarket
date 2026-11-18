@@ -4,28 +4,28 @@ import { authRequired, adminOnly } from '../auth.js';
 
 const r = Router();
 
-const DEFAULTS = {
-  brokerName: 'Doo Financial Futures',
+const DEFAULTS = (tenantName = 'Doo Financial Futures') => ({
+  brokerName: tenantName,
   brokerLogo: '',
-};
+});
 
-async function readSettings(db) {
-  const doc = await db.collection('settings').findOne({ _id: 'app' });
-  return { ...DEFAULTS, ...(doc?.value || {}) };
+async function readSettings(db, tenantId, tenantName) {
+  const doc = await db.collection('settings').findOne({ tenantId });
+  return { ...DEFAULTS(tenantName), ...(doc?.value || {}) };
 }
 
 r.get('/', authRequired, async (req, res) => {
   const db = getDb();
-  res.json(await readSettings(db));
+  res.json(await readSettings(db, req.tenantId, req.tenant.name));
 });
 
 r.patch('/', authRequired, adminOnly, async (req, res) => {
   const db = getDb();
   const { brokerName, brokerLogo } = req.body || {};
-  const current = await readSettings(db);
+  const current = await readSettings(db, req.tenantId, req.tenant.name);
   const next = { ...current };
 
-  if (brokerName !== undefined) next.brokerName = String(brokerName).slice(0, 120).trim() || DEFAULTS.brokerName;
+  if (brokerName !== undefined) next.brokerName = String(brokerName).slice(0, 120).trim() || req.tenant.name;
 
   if (brokerLogo !== undefined) {
     if (brokerLogo === '') {
@@ -45,8 +45,8 @@ r.patch('/', authRequired, adminOnly, async (req, res) => {
   }
 
   await db.collection('settings').updateOne(
-    { _id: 'app' },
-    { $set: { value: next, updatedAt: new Date() } },
+    { tenantId: req.tenantId },
+    { $set: { value: next, tenantId: req.tenantId, updatedAt: new Date() } },
     { upsert: true },
   );
   res.json(next);
